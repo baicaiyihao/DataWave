@@ -1,4 +1,4 @@
-// Copyright (c), DataWave Survey System with Automatic Incentive & Revenue Sharing
+// Copyright (c), DataWave Survey System
 // SPDX-License-Identifier: Apache-2.0
 
 module datawave::survey_system;
@@ -10,28 +10,78 @@ use sui::{
     clock::Clock,
     coin::{Self, Coin},
     sui::SUI,
+    vec_set::{Self, VecSet},
     event
 };
 
 // =================== 错误码 ===================
 const EInvalidCap: u64 = 0;
 const ENoAccess: u64 = 1;
-const EDuplicate: u64 = 2;
 const EInvalidFee: u64 = 3;
 const ESurveyCompleted: u64 = 4;
 const EAlreadyAnswered: u64 = 5;
-const ENotAuthorized: u64 = 6;
-const EInsufficientReward: u64 = 7;
 const ENoDividend: u64 = 8;
 const EInvalidRatio: u64 = 9;
 const EInsufficientInitialPool: u64 = 10;
+const ENotAdmin: u64 = 11;
+const ENotAuthorized: u64 = 12;
 
 // =================== 常量 ===================
 const HUNDRED_PERCENT: u64 = 10000; // 100.00% 用基点表示
 const MAX_CREATOR_SHARE: u64 = 4000; // 创建者最多40%
 const MIN_RESPONDENT_SHARE: u64 = 5000; // 答题者至少50%
 const MIN_PLATFORM_SHARE: u64 = 500; // 平台至少5%
-const PLATFORM_ADDRESS: address = @0xPLATFORM; // 平台地址（需要配置）
+
+// =================== 平台管理 ===================
+
+/// 平台配置（one-time witness pattern）
+public struct SURVEY_SYSTEM has drop {}
+
+/// 平台管理权限（创建时生成，只有一个）
+public struct PlatformAdminCap has key {
+    id: UID,
+}
+
+/// 平台金库（共享对象，收集平台费用）
+public struct PlatformTreasury has key {
+    id: UID,
+    total_fees_collected: u64,
+    balance: Balance<SUI>,
+    admin: address,  // 平台管理员地址
+}
+
+/// 问卷注册表（全局共享对象）
+public struct SurveyRegistry has key {
+    id: UID,
+    
+    // 所有问卷索引
+    all_surveys: Table<ID, SurveyMeta>,
+    
+    // 创建者的问卷映射  
+    creator_surveys: Table<address, vector<ID>>,
+    
+    // 分类
+    surveys_by_category: Table<String, vector<ID>>,
+    
+    // 统计
+    total_surveys: u64,
+    active_surveys: u64,
+    
+    // 黑名单
+    banned_surveys: VecSet<ID>,
+    banned_creators: VecSet<address>,
+}
+
+/// 问卷元数据（轻量级索引）
+public struct SurveyMeta has store, drop, copy {
+    survey_id: ID,
+    creator: address,
+    title: String,
+    category: String,
+    created_at: u64,
+    is_active: bool,
+    is_banned: bool,
+}
 
 // =================== 核心结构定义 ===================
 
@@ -166,6 +216,134 @@ public struct SurveyClosedEvent has copy, drop {
     timestamp: u64,
 }
 
+/// 平台费用提取事件
+public struct PlatformFeeWithdrawnEvent has copy, drop {
+    amount: u64,
+    admin: address,
+    timestamp: u64,
+}
+
+/// 问卷更新事件
+public struct SurveyUpdatedEvent has copy, drop {
+    survey_id: ID,
+    update_type: String,
+    timestamp: u64,
+}
+
+// =================== 初始化 ===================
+
+/// 模块初始化函数，部署时自动执行
+fun init(_witness: SURVEY_SYSTEM, ctx: &mut TxContext) {
+    // 创建平台管理权限，发送给部署者
+    let admin_cap = PlatformAdminCap {
+        id: object::new(ctx)
+    };
+    
+    // 创建平台金库
+    let treasury = PlatformTreasury {
+        id: object::new(ctx),
+        total_fees_collected: 0,
+        balance: balance::zero(),
+        admin: ctx.sender(),  // 部署者是管理员
+    };
+    
+    // 创建问卷注册表
+    let mut registry = SurveyRegistry {
+        id: object::new(ctx),
+        all_surveys: table::new(ctx),
+        creator_surveys: table::new(ctx),
+        surveys_by_category: table::new(ctx),
+        total_surveys: 0,
+        active_surveys: 0,
+        banned_surveys: vec_set::empty(),
+        banned_creators: vec_set::empty(),
+    };
+    
+    // 初始化默认分类
+    table::add(&mut registry.surveys_by_category, b"market_research".to_string(), vector::empty());
+    table::add(&mut registry.surveys_by_category, b"user_feedback".to_string(), vector::empty());
+    table::add(&mut registry.surveys_by_category, b"academic_research".to_string(), vector::empty());
+    table::add(&mut registry.surveys_by_category, b"product_testing".to_string(), vector::empty());
+    table::add(&mut registry.surveys_by_category, b"other".to_string(), vector::empty());
+    
+    // 共享对象
+    transfer::share_object(treasury);
+    transfer::share_object(registry);
+    
+    // 管理权限发送给部署者
+    transfer::transfer(admin_cap, ctx.sender());
+}
+
+// =================== 平台管理函数 ===================
+
+/// 提取平台费用（内部函数）
+public fun withdraw_platform_fees_internal(
+    _admin_cap: &PlatformAdminCap,
+    treasury: &mut PlatformTreasury,
+    amount: u64,
+    ctx: &mut TxContext
+): Coin<SUI> {
+    assert!(balance::value(&treasury.balance) >= amount, EInvalidFee);
+    // 额外验证：确保调用者是管理员
+    assert!(treasury.admin == ctx.sender(), ENotAdmin);
+    
+    let payment = coin::take(&mut treasury.balance, amount, ctx);
+    
+    event::emit(PlatformFeeWithdrawnEvent {
+        amount,
+        admin: ctx.sender(),
+        timestamp: ctx.epoch_timestamp_ms(),
+    });
+    
+    payment
+}
+
+/// Entry函数：提取指定金额的平台费用
+entry fun withdraw_platform_fees(
+    admin_cap: &PlatformAdminCap,
+    treasury: &mut PlatformTreasury,
+    amount: u64,
+    ctx: &mut TxContext
+) {
+    let payment = withdraw_platform_fees_internal(admin_cap, treasury, amount, ctx);
+    transfer::public_transfer(payment, ctx.sender());
+}
+
+/// Entry函数：提取全部平台费用
+entry fun withdraw_all_platform_fees(
+    admin_cap: &PlatformAdminCap,
+    treasury: &mut PlatformTreasury,
+    ctx: &mut TxContext
+) {
+    let amount = balance::value(&treasury.balance);
+    if (amount > 0) {
+        let payment = withdraw_platform_fees_internal(admin_cap, treasury, amount, ctx);
+        transfer::public_transfer(payment, ctx.sender());
+    }
+}
+
+/// Entry函数：提取费用并发送给指定地址
+entry fun withdraw_and_transfer_fees(
+    admin_cap: &PlatformAdminCap,
+    treasury: &mut PlatformTreasury,
+    amount: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let payment = withdraw_platform_fees_internal(admin_cap, treasury, amount, ctx);
+    transfer::public_transfer(payment, recipient);
+}
+
+/// 更改平台管理员
+entry fun change_platform_admin(
+    admin_cap: PlatformAdminCap,
+    treasury: &mut PlatformTreasury,
+    new_admin: address,
+) {
+    treasury.admin = new_admin;
+    transfer::transfer(admin_cap, new_admin);
+}
+
 // =================== 问卷创建 ===================
 
 /// 创建带激励和收益分享的问卷
@@ -173,38 +351,39 @@ public fun create_survey_with_incentive(
     title: String,
     description: String,
     questions: vector<String>,
+    category: String,  // 新增分类参数
     reward_per_response: u64,
     initial_reward_pool: Coin<SUI>,
-    // 分红设置
-    dividend_threshold: u64,      // 触发分红的金额阈值
-    min_interval_hours: u64,      // 最小分红间隔（小时）
-    creator_ratio: u64,           // 创建者分成比例
-    respondent_ratio: u64,        // 答题者分成比例
-    auto_close_on_empty: bool,    // 奖励用完时自动关闭
+    dividend_threshold: u64,
+    min_interval_hours: u64,
+    creator_ratio: u64,
+    respondent_ratio: u64,
+    auto_close_on_empty: bool,
+    registry: &mut SurveyRegistry,  // 传入注册表
     c: &Clock,
     ctx: &mut TxContext,
 ): SurveyCap {
     let creator = ctx.sender();
     let pool_value = coin::value(&initial_reward_pool);
     
-    // 验证初始奖励池足够
-    assert!(
-        pool_value >= reward_per_response * 10,  // 至少支持10个回答
-        EInsufficientInitialPool
-    );
+    // 检查创建者是否被封禁
+    assert!(!vec_set::contains(&registry.banned_creators, &creator), ENotAuthorized);
     
-    // 计算平台分成比例
+    // 验证初始奖励池
+    assert!(pool_value >= reward_per_response * 10, EInsufficientInitialPool);
+    
+    // 计算平台分成
     let platform_ratio = HUNDRED_PERCENT - creator_ratio - respondent_ratio;
     
-    // 验证比例合理
+    // 验证比例
     assert!(creator_ratio <= MAX_CREATOR_SHARE, EInvalidRatio);
     assert!(respondent_ratio >= MIN_RESPONDENT_SHARE, EInvalidRatio);
     assert!(platform_ratio >= MIN_PLATFORM_SHARE, EInvalidRatio);
     
-    let mut survey = Survey {
+    let survey = Survey {
         id: object::new(ctx),
-        title,
-        description,
+        title: title,
+        description: description,
         questions,
         creator,
         is_active: true,
@@ -224,24 +403,20 @@ public fun create_survey_with_incentive(
         subscription_ttl: 0,
         subscribers: table::new(ctx),
         
-        // 激励机制
         reward_pool: coin::into_balance(initial_reward_pool),
         reward_per_response,
         total_reward_distributed: 0,
         
-        // 收益分享（比例锁定，不可更改）
         revenue_sharing_enabled: true,
         creator_share_ratio: creator_ratio,
         respondent_share_ratio: respondent_ratio,
         platform_share_ratio: platform_ratio,
         
-        // 收益管理
         revenue_pool: balance::zero(),
         dividend_reserve: balance::zero(),
         total_revenue: 0,
         distributed_revenue: 0,
         
-        // 分红设置
         dividend_threshold,
         last_dividend_time: c.timestamp_ms(),
         min_dividend_interval: min_interval_hours * 3600 * 1000,
@@ -250,6 +425,40 @@ public fun create_survey_with_incentive(
     };
     
     let survey_id = object::id(&survey);
+    
+    // 注册到注册表
+    let meta = SurveyMeta {
+        survey_id,
+        creator,
+        title: title,
+        category: category,
+        created_at: c.timestamp_ms(),
+        is_active: true,
+        is_banned: false,
+    };
+    
+    table::add(&mut registry.all_surveys, survey_id, meta);
+    
+    // 添加到创建者列表
+    if (table::contains(&registry.creator_surveys, creator)) {
+        let surveys = table::borrow_mut(&mut registry.creator_surveys, creator);
+        vector::push_back(surveys, survey_id);
+    } else {
+        let mut surveys = vector::empty();
+        vector::push_back(&mut surveys, survey_id);
+        table::add(&mut registry.creator_surveys, creator, surveys);
+    };
+    
+    // 添加到分类
+    if (table::contains(&registry.surveys_by_category, category)) {
+        let category_surveys = table::borrow_mut(&mut registry.surveys_by_category, category);
+        vector::push_back(category_surveys, survey_id);
+    };
+    
+    // 更新统计
+    registry.total_surveys = registry.total_surveys + 1;
+    registry.active_surveys = registry.active_surveys + 1;
+    
     transfer::share_object(survey);
     
     SurveyCap {
@@ -263,6 +472,7 @@ entry fun create_survey_entry(
     title: String,
     description: String,
     questions: vector<String>,
+    category: String,  // 新增分类
     reward_per_response: u64,
     initial_reward_pool: Coin<SUI>,
     dividend_threshold: u64,
@@ -270,29 +480,78 @@ entry fun create_survey_entry(
     creator_ratio: u64,
     respondent_ratio: u64,
     auto_close: bool,
+    registry: &mut SurveyRegistry,  // 传入注册表
     c: &Clock,
     ctx: &mut TxContext,
 ) {
     let cap = create_survey_with_incentive(
-        title, description, questions,
+        title, description, questions, category,
         reward_per_response, initial_reward_pool,
         dividend_threshold, min_interval_hours,
         creator_ratio, respondent_ratio,
-        auto_close, c, ctx
+        auto_close, registry, c, ctx
     );
     transfer::transfer(cap, ctx.sender());
+}
+
+// =================== 管理员强制操作 ===================
+
+/// 管理员强制关闭问卷
+entry fun admin_force_close_survey(
+    _admin_cap: &PlatformAdminCap,
+    survey: &mut Survey,
+    treasury: &mut PlatformTreasury,
+    c: &Clock,
+    ctx: &mut TxContext,
+) {
+    survey.is_active = false;
+    survey.closed_at = option::some(c.timestamp_ms());
+    
+    // 强制触发分红（如果有收益）
+    try_distribute_dividends(survey, treasury, c.timestamp_ms(), ctx);
+    
+    event::emit(SurveyClosedEvent {
+        survey_id: object::id(survey),
+        reason: b"Admin force closed".to_string(),
+        remaining_pool: balance::value(&survey.reward_pool),
+        total_responses: survey.answer_count,
+        timestamp: c.timestamp_ms(),
+    });
+}
+
+/// 管理员修改问卷状态
+entry fun admin_update_survey_status(
+    _admin_cap: &PlatformAdminCap,
+    survey: &mut Survey,
+    is_active: bool,
+    c: &Clock,
+) {
+    survey.is_active = is_active;
+    
+    if (!is_active && option::is_none(&survey.closed_at)) {
+        survey.closed_at = option::some(c.timestamp_ms());
+    } else if (is_active) {
+        survey.closed_at = option::none();
+    };
+    
+    event::emit(SurveyUpdatedEvent {
+        survey_id: object::id(survey),
+        update_type: b"admin_status_update".to_string(),
+        timestamp: c.timestamp_ms(),
+    });
 }
 
 // =================== 答案提交（自动发放奖励）===================
 
 /// 提交答案并自动发放奖励
+#[allow(lint(self_transfer))]
 public fun submit_answer_with_auto_reward(
     survey: &mut Survey,
     encrypted_blob_id: String,
     authorize_sharing: bool,
     c: &Clock,
     ctx: &mut TxContext,
-): Option<Coin<SUI>> {
+) {
     let respondent = ctx.sender();
     
     // 检查问卷状态
@@ -300,10 +559,12 @@ public fun submit_answer_with_auto_reward(
     assert!(!table::contains(&survey.answers, respondent), EAlreadyAnswered);
     
     // 检查并发放奖励
-    let reward_coin = if (balance::value(&survey.reward_pool) >= survey.reward_per_response) {
+    let actual_reward = if (balance::value(&survey.reward_pool) >= survey.reward_per_response) {
         let reward = coin::take(&mut survey.reward_pool, survey.reward_per_response, ctx);
         survey.total_reward_distributed = survey.total_reward_distributed + survey.reward_per_response;
-        option::some(reward)
+        // 直接转给用户
+        transfer::public_transfer(reward, respondent);
+        survey.reward_per_response
     } else {
         // 奖励池不足，检查是否自动关闭
         if (survey.auto_close_on_empty_rewards) {
@@ -318,12 +579,6 @@ public fun submit_answer_with_auto_reward(
                 timestamp: c.timestamp_ms(),
             });
         };
-        option::none()
-    };
-    
-    let actual_reward = if (option::is_some(&reward_coin)) {
-        survey.reward_per_response
-    } else {
         0
     };
     
@@ -357,11 +612,9 @@ public fun submit_answer_with_auto_reward(
         reward_amount: actual_reward,
         timestamp: c.timestamp_ms(),
     });
-    
-    reward_coin
 }
 
-/// Entry函数：提交答案（奖励直接转给用户）
+/// Entry函数：提交答案（奖励自动转给用户）
 entry fun submit_answer_entry(
     survey: &mut Survey,
     encrypted_blob_id: String,
@@ -369,27 +622,21 @@ entry fun submit_answer_entry(
     c: &Clock,
     ctx: &mut TxContext,
 ) {
-    let reward_opt = submit_answer_with_auto_reward(
+    submit_answer_with_auto_reward(
         survey,
         encrypted_blob_id,
         authorize_sharing,
         c,
         ctx
     );
-    
-    // 如果有奖励，直接转给用户
-    if (option::is_some(&reward_opt)) {
-        let reward = option::destroy_some(reward_opt);
-        transfer::public_transfer(reward, ctx.sender());
-    };
 }
 
 /// 更新已提交的答案
-public fun update_answer_set(
+entry fun update_answer_set(
     survey: &mut Survey,
     new_encrypted_blob_id: String,
     c: &Clock,
-    ctx: &mut TxContext,
+    ctx: &TxContext,
 ) {
     let respondent = ctx.sender();
     
@@ -404,7 +651,7 @@ public fun update_answer_set(
 // =================== Allowlist 管理 ===================
 
 /// 添加地址到allowlist
-public fun add_to_allowlist(
+entry fun add_to_allowlist(
     survey: &mut Survey,
     cap: &SurveyCap,
     account: address,
@@ -417,7 +664,7 @@ public fun add_to_allowlist(
 }
 
 /// 批量添加到allowlist
-public fun batch_add_to_allowlist(
+entry fun batch_add_to_allowlist(
     survey: &mut Survey,
     cap: &SurveyCap,
     accounts: vector<address>,
@@ -435,7 +682,7 @@ public fun batch_add_to_allowlist(
 }
 
 /// 从allowlist移除
-public fun remove_from_allowlist(
+entry fun remove_from_allowlist(
     survey: &mut Survey,
     cap: &SurveyCap,
     account: address,
@@ -451,7 +698,7 @@ public fun remove_from_allowlist(
 // =================== 订阅与自动分红 ===================
 
 /// 启用订阅模式
-public fun enable_subscription(
+entry fun enable_subscription(
     survey: &mut Survey,
     cap: &SurveyCap,
     fee: u64,
@@ -464,10 +711,11 @@ public fun enable_subscription(
     survey.subscription_ttl = ttl;
 }
 
-/// 购买订阅并自动触发分红
-public fun subscribe_with_auto_dividend(
+/// 购买订阅并自动触发分红（内部函数）
+fun subscribe_with_auto_dividend_internal(
     payment: Coin<SUI>,
     survey: &mut Survey,
+    treasury: &mut PlatformTreasury,
     c: &Clock,
     ctx: &mut TxContext,
 ): SurveySubscription {
@@ -499,7 +747,7 @@ public fun subscribe_with_auto_dividend(
     });
     
     // 【关键】自动尝试执行分红
-    try_distribute_dividends(survey, current_time, ctx);
+    try_distribute_dividends(survey, treasury, current_time, ctx);
     
     // 返回订阅凭证
     SurveySubscription {
@@ -515,10 +763,13 @@ public fun subscribe_with_auto_dividend(
 entry fun subscribe_entry(
     payment: Coin<SUI>,
     survey: &mut Survey,
+    treasury: &mut PlatformTreasury,
     c: &Clock,
     ctx: &mut TxContext,
 ) {
-    let subscription = subscribe_with_auto_dividend(payment, survey, c, ctx);
+    let subscription = subscribe_with_auto_dividend_internal(
+        payment, survey, treasury, c, ctx
+    );
     transfer::transfer(subscription, ctx.sender());
 }
 
@@ -527,6 +778,7 @@ entry fun subscribe_entry(
 /// 尝试执行分红（内部函数）
 fun try_distribute_dividends(
     survey: &mut Survey,
+    treasury: &mut PlatformTreasury,
     current_time: u64,
     ctx: &mut TxContext,
 ) {
@@ -554,10 +806,11 @@ fun try_distribute_dividends(
         transfer::public_transfer(creator_payment, survey.creator);
     };
     
-    // 2. 平台立即获得
+    // 2. 平台费用进入金库
     if (platform_amount > 0) {
-        let platform_payment = coin::take(&mut survey.revenue_pool, platform_amount, ctx);
-        transfer::public_transfer(platform_payment, PLATFORM_ADDRESS);
+        let platform_fee = coin::take(&mut survey.revenue_pool, platform_amount, ctx);
+        balance::join(&mut treasury.balance, coin::into_balance(platform_fee));
+        treasury.total_fees_collected = treasury.total_fees_collected + platform_amount;
     };
     
     // 3. 答题者分红 - 遍历授权用户列表
@@ -643,8 +896,140 @@ entry fun claim_dividend_entry(
 
 // =================== 问卷管理功能 ===================
 
+/// 修改问卷标题
+entry fun update_survey_title(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    new_title: String,
+    ctx: &TxContext,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidCap);
+    survey.title = new_title;
+    
+    event::emit(SurveyUpdatedEvent {
+        survey_id: object::id(survey),
+        update_type: b"title".to_string(),
+        timestamp: ctx.epoch_timestamp_ms(),
+    });
+}
+
+/// 修改问卷描述
+entry fun update_survey_description(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    new_description: String,
+    ctx: &TxContext,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidCap);
+    survey.description = new_description;
+    
+    event::emit(SurveyUpdatedEvent {
+        survey_id: object::id(survey),
+        update_type: b"description".to_string(),
+        timestamp: ctx.epoch_timestamp_ms(),
+    });
+}
+
+/// 修改问卷问题列表（仅在无人答题时可修改）
+entry fun update_survey_questions(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    new_questions: vector<String>,
+    ctx: &TxContext,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidCap);
+    // 只有在还没有人答题时才能修改问题
+    assert!(survey.answer_count == 0, ESurveyCompleted);
+    survey.questions = new_questions;
+    
+    event::emit(SurveyUpdatedEvent {
+        survey_id: object::id(survey),
+        update_type: b"questions".to_string(),
+        timestamp: ctx.epoch_timestamp_ms(),
+    });
+}
+
+/// 修改奖励金额（仅在无人答题时可修改）
+entry fun update_reward_per_response(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    new_reward: u64,
+    ctx: &TxContext,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidCap);
+    // 只有在还没有人答题时才能修改奖励
+    assert!(survey.answer_count == 0, ESurveyCompleted);
+    // 确保奖励池足够支持新的奖励金额
+    assert!(
+        balance::value(&survey.reward_pool) >= new_reward * 10,
+        EInsufficientInitialPool
+    );
+    survey.reward_per_response = new_reward;
+    
+    event::emit(SurveyUpdatedEvent {
+        survey_id: object::id(survey),
+        update_type: b"reward".to_string(),
+        timestamp: ctx.epoch_timestamp_ms(),
+    });
+}
+
+/// 修改订阅费用和有效期
+entry fun update_subscription_settings(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    new_fee: u64,
+    new_ttl: u64,
+    ctx: &TxContext,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidCap);
+    survey.subscription_fee = new_fee;
+    survey.subscription_ttl = new_ttl;
+    
+    event::emit(SurveyUpdatedEvent {
+        survey_id: object::id(survey),
+        update_type: b"subscription".to_string(),
+        timestamp: ctx.epoch_timestamp_ms(),
+    });
+}
+
+/// 修改分红阈值和间隔
+entry fun update_dividend_settings(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    new_threshold: u64,
+    new_interval_hours: u64,
+    ctx: &TxContext,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidCap);
+    survey.dividend_threshold = new_threshold;
+    survey.min_dividend_interval = new_interval_hours * 3600 * 1000;
+    
+    event::emit(SurveyUpdatedEvent {
+        survey_id: object::id(survey),
+        update_type: b"dividend".to_string(),  
+        timestamp: ctx.epoch_timestamp_ms(),
+    });
+}
+
+/// 切换自动关闭设置
+entry fun toggle_auto_close(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    auto_close: bool,
+    ctx: &TxContext,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidCap);
+    survey.auto_close_on_empty_rewards = auto_close;
+    
+    event::emit(SurveyUpdatedEvent {
+        survey_id: object::id(survey),
+        update_type: b"auto_close".to_string(),
+        timestamp: ctx.epoch_timestamp_ms(),
+    });
+}
+
 /// 关闭问卷
-public fun close_survey(
+entry fun close_survey(
     survey: &mut Survey,
     cap: &SurveyCap,
     c: &Clock,
@@ -655,7 +1040,7 @@ public fun close_survey(
 }
 
 /// 重新开启问卷
-public fun reopen_survey(
+entry fun reopen_survey(
     survey: &mut Survey,
     cap: &SurveyCap,
 ) {
@@ -665,13 +1050,29 @@ public fun reopen_survey(
 }
 
 /// 补充奖励池
-public fun add_to_reward_pool(
+entry fun add_to_reward_pool(
     survey: &mut Survey,
     cap: &SurveyCap,
     additional_rewards: Coin<SUI>,
 ) {
     assert!(cap.survey_id == object::id(survey), EInvalidCap);
     balance::join(&mut survey.reward_pool, coin::into_balance(additional_rewards));
+}
+
+/// 提取剩余奖励（仅在问卷关闭后）
+entry fun withdraw_remaining_rewards(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    ctx: &mut TxContext,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidCap);
+    assert!(!survey.is_active, ENoAccess);
+    
+    let amount = balance::value(&survey.reward_pool);
+    if (amount > 0) {
+        let payment = coin::take(&mut survey.reward_pool, amount, ctx);
+        transfer::public_transfer(payment, survey.creator);
+    }
 }
 
 // =================== 访问控制（与Seal集成）===================
@@ -758,8 +1159,8 @@ public fun get_user_earnings(
     survey: &Survey,
     user: address,
 ): (u64, u64, bool) {  // (总收益, 待领取分红, 是否已领取填写奖励)
-    let total_earnings = 0u64;
-    let reward_claimed = false;
+    let mut total_earnings = 0u64;
+    let mut reward_claimed = false;
     
     if (table::contains(&survey.answers, user)) {
         let answer_set = table::borrow(&survey.answers, user);
@@ -837,8 +1238,8 @@ public fun check_reward_pool_status(survey: &Survey): (u64, u64, bool) {
 }
 
 /// 获取下次分红信息
+#[allow(unused_variable)]
 public fun get_next_dividend_info(survey: &Survey, c: &Clock): (u64, u64, u64) {
-    let current_time = c.timestamp_ms();
     let next_time = survey.last_dividend_time + survey.min_dividend_interval;
     let current_pool = balance::value(&survey.revenue_pool);
     let needed_amount = if (current_pool >= survey.dividend_threshold) {
@@ -861,4 +1262,120 @@ public fun get_pending_dividend(survey: &Survey, user: address): u64 {
     } else {
         0
     }
+}
+
+/// 获取平台金库信息
+public fun get_treasury_info(treasury: &PlatformTreasury): (u64, u64, address) {
+    (
+        balance::value(&treasury.balance),
+        treasury.total_fees_collected,
+        treasury.admin
+    )
+}
+
+/// 获取订阅信息
+public fun get_subscription_info(
+    survey: &Survey,
+    user: address,
+    c: &Clock
+): (bool, u64) {  // (是否有效, 剩余时间)
+    if (survey.subscription_enabled && table::contains(&survey.subscribers, user)) {
+        let subscribed_at = *table::borrow(&survey.subscribers, user);
+        let expires_at = subscribed_at + survey.subscription_ttl;
+        let current_time = c.timestamp_ms();
+        
+        if (current_time < expires_at) {
+            (true, expires_at - current_time)
+        } else {
+            (false, 0)
+        }
+    } else {
+        (false, 0)
+    }
+}
+
+// =================== 注册表查询功能 ===================
+
+/// 获取创建者的所有问卷
+public fun get_creator_surveys(
+    registry: &SurveyRegistry,
+    creator: address,
+): vector<ID> {
+    if (table::contains(&registry.creator_surveys, creator)) {
+        *table::borrow(&registry.creator_surveys, creator)
+    } else {
+        vector::empty()
+    }
+}
+
+/// 获取分类下的问卷
+public fun get_surveys_by_category(
+    registry: &SurveyRegistry,
+    category: String,
+): vector<ID> {
+    if (table::contains(&registry.surveys_by_category, category)) {
+        *table::borrow(&registry.surveys_by_category, category)
+    } else {
+        vector::empty()
+    }
+}
+
+/// 检查创建者是否被封禁
+public fun is_creator_banned(
+    registry: &SurveyRegistry,
+    creator: address,
+): bool {
+    vec_set::contains(&registry.banned_creators, &creator)
+}
+
+/// 封禁问卷（管理员）
+entry fun ban_survey(
+    _admin_cap: &PlatformAdminCap,
+    registry: &mut SurveyRegistry,
+    survey: &mut Survey,
+    survey_id: ID,
+) {
+    vec_set::insert(&mut registry.banned_surveys, survey_id);
+    
+    if (table::contains(&registry.all_surveys, survey_id)) {
+        let meta = table::borrow_mut(&mut registry.all_surveys, survey_id);
+        meta.is_banned = true;
+        meta.is_active = false;
+        
+        if (registry.active_surveys > 0) {
+            registry.active_surveys = registry.active_surveys - 1;
+        };
+    };
+    
+    // 同时更新survey对象
+    survey.is_active = false;
+}
+
+/// 封禁创建者（管理员）
+entry fun ban_creator(
+    _admin_cap: &PlatformAdminCap,
+    registry: &mut SurveyRegistry,
+    creator: address,
+) {
+    vec_set::insert(&mut registry.banned_creators, creator);
+    
+    // 暂停该创建者的所有问卷
+    if (table::contains(&registry.creator_surveys, creator)) {
+        let survey_ids = table::borrow(&registry.creator_surveys, creator);
+        let mut i = 0;
+        
+        while (i < vector::length(survey_ids)) {
+            let survey_id = *vector::borrow(survey_ids, i);
+            
+            if (table::contains(&registry.all_surveys, survey_id)) {
+                let meta = table::borrow_mut(&mut registry.all_surveys, survey_id);
+                if (meta.is_active) {
+                    meta.is_active = false;
+                    registry.active_surveys = registry.active_surveys - 1;
+                };
+            };
+            
+            i = i + 1;
+        };
+    };
 }

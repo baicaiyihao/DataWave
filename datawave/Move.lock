@@ -2,47 +2,33 @@
 
 [move]
 version = 3
-manifest_digest = "25B52E99230A17477CCA305C91A3B47835E074FA0B0B35CF27781DAA9AF72978"
-deps_digest = "F9B494B64F0615AED0E98FC12A85B85ECD2BC5185C22D30E7F67786BB52E507C"
+manifest_digest = "8D9965F14A940B3FE1AC82D326C917662EB0B00B6D90CCCE2C62C025E9DEF05C"
+deps_digest = "F8BBB0CCB2491CA29A3DF03D6F92277A4F3574266507ACD77214D37ECA3F3082"
 dependencies = [
-  { id = "Bridge", name = "Bridge" },
-  { id = "MoveStdlib", name = "MoveStdlib" },
   { id = "Sui", name = "Sui" },
-  { id = "SuiSystem", name = "SuiSystem" },
-]
-
-[[move.package]]
-id = "Bridge"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "af5297b292c3", subdir = "crates/sui-framework/packages/bridge" }
-
-dependencies = [
-  { id = "MoveStdlib", name = "MoveStdlib" },
-  { id = "Sui", name = "Sui" },
-  { id = "SuiSystem", name = "SuiSystem" },
 ]
 
 [[move.package]]
 id = "MoveStdlib"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "af5297b292c3", subdir = "crates/sui-framework/packages/move-stdlib" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/testnet", subdir = "crates/sui-framework/packages/move-stdlib" }
 
 [[move.package]]
 id = "Sui"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "af5297b292c3", subdir = "crates/sui-framework/packages/sui-framework" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/testnet", subdir = "crates/sui-framework/packages/sui-framework" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
-]
-
-[[move.package]]
-id = "SuiSystem"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "af5297b292c3", subdir = "crates/sui-framework/packages/sui-system" }
-
-dependencies = [
-  { id = "MoveStdlib", name = "MoveStdlib" },
-  { id = "Sui", name = "Sui" },
 ]
 
 [move.toolchain-version]
-compiler-version = "1.50.1"
+compiler-version = "1.60.0"
 edition = "2024.beta"
 flavor = "sui"
+
+[env]
+
+[env.testnet]
+chain-id = "4c78adac"
+original-published-id = "0xfee27bea0900e37dc4110cc47e46d75035be56b64f20b4013c28db7643eac4f9"
+latest-published-id = "0xfee27bea0900e37dc4110cc47e46d75035be56b64f20b4013c28db7643eac4f9"
+published-version = "1"

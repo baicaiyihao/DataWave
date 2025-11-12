@@ -1,5 +1,5 @@
 // Answer Survey Component with Seal & Walrus Integration
-// 基于实际的 Seal 加密和 Walrus 上传代码
+// 基于官方示例修正的版本
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, RadioGroup, Checkbox, TextArea, Switch, Spinner } from '@radix-ui/themes';
@@ -102,7 +102,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
   const currentAccount = useCurrentAccount();
   const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   
-  // Seal client setup (需要根据实际的 Seal 服务器配置)
+  // Seal client setup
   const serverObjectIds = [
     "0x73d05d62c18d9374e3ea529e8e0ed6161da1a141a94d3f76ae3fe4e99356db75",
     "0xf5d14a81a982144ae441cd7d64b09027f116a468bd36e7eca494f750591623c8"
@@ -239,7 +239,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
     const question = survey.questions[currentQuestionIndex];
     
     if (!currentAnswer || (Array.isArray(currentAnswer) && currentAnswer.length === 0)) {
-      alert('Please provide an answer');
+      alert('请提供一个答案');
       return;
     }
 
@@ -280,57 +280,12 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
     }
   };
 
-
-
-  // 上传到 Walrus
-  const uploadToWalrus = async (encryptedData: Uint8Array): Promise<string> => {
-    try {
-      const response = await fetch(getPublisherUrl(`/blobs?epochs=${NUM_EPOCH}`), {
-        method: 'PUT',
-        body: encryptedData,
-      });
-
-      if (!response.ok) {
-        // 尝试切换到另一个服务
-        const currentIndex = walrusServices.findIndex(s => s.id === selectedWalrusService);
-        const nextService = walrusServices[(currentIndex + 1) % walrusServices.length];
-        setSelectedWalrusService(nextService.id);
-        
-        throw new Error('Failed to upload to Walrus, please try again with a different service');
-      }
-
-      const result = await response.json();
-      console.log('Walrus upload response:', result);
-      
-      // 根据返回格式提取 blob ID
-      let blobId: string;
-      
-      if ('alreadyCertified' in result) {
-        // 数据已经存在的情况
-        blobId = result.alreadyCertified.blobId;
-        console.log('Blob already certified:', blobId);
-      } else if ('newlyCreated' in result) {
-        // 新创建的情况
-        blobId = result.newlyCreated.blobObject.blobId;
-        console.log('New blob created:', blobId);
-      } else {
-        console.error('Unexpected Walrus response format:', result);
-        throw new Error('Unexpected response format from Walrus');
-      }
-      
-      return blobId;
-    } catch (error) {
-      console.error('Walrus upload error:', error);
-      throw error;
-    }
-  };
-
-  // 提交答案
+  // 提交答案 - 基于官方示例的版本
   const submitAnswers = async () => {
     if (!survey || !currentAccount?.address) return;
 
     // 保存最后一题的答案
-    if (currentQuestionIndex === survey.questions.length - 1) {
+    if (currentQuestionIndex === survey.questions.length - 1 && currentAnswer) {
       saveAndNext();
     }
 
@@ -345,7 +300,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
       }] : answers;
 
     if (finalAnswers.length !== survey.questions.length) {
-      alert(`Please answer all ${survey.questions.length} questions`);
+      alert(`请回答所有 ${survey.questions.length} 个问题`);
       return;
     }
 
@@ -353,7 +308,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
     setUploadingStep('encrypting');
     
     try {
-      // 1. 准备答案数据
+      // 1. 准备答案数据（就像文件内容一样）
       const answerData = {
         surveyId: survey.id,
         respondent: currentAccount.address,
@@ -370,42 +325,66 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
       const answerJson = JSON.stringify(answerData);
       const answerBytes = new TextEncoder().encode(answerJson);
 
-      // 2. 生成 seal key id (需要在加密前生成，以便在加密时使用)
+      // 2. 按照官方示例生成ID：先生成字节，然后转为hex
       const nonce = crypto.getRandomValues(new Uint8Array(5));
       const surveyIdBytes = fromHex(surveyId.replace(/^0x/, ''));
-      const sealKeyId = toHex(new Uint8Array([...surveyIdBytes, ...nonce]));
+      const id = toHex(new Uint8Array([...surveyIdBytes, ...nonce]));
       
-      // 3. Seal 加密（使用生成的 sealKeyId）
-      setUploadProgress('Encrypting your answers with Seal...');
+      // 3. Seal 加密 - 使用hex字符串ID（就像官方示例）
+      setUploadProgress('使用Seal加密您的答案...');
       
-      // 加密时使用 sealKeyId 作为 id
       const { encryptedObject: encryptedData } = await sealClient.encrypt({
         threshold: 2,
         packageId: ConfigService.getPackageId(),
-        id: sealKeyId,  // 使用生成的 sealKeyId
-        data: answerBytes,
+        id: id,  // hex字符串，就像官方示例
+        data: answerBytes,  // Uint8Array，就像文件内容
       });
       
-      console.log('Encrypted with Seal, Key ID:', sealKeyId);
+      console.log('Seal加密完成，Key ID:', id);
       
-      // 4. Walrus 上传
+      // 4. Walrus 上传（就像官方示例的storeBlob）
       setUploadingStep('uploading');
-      setUploadProgress('Uploading encrypted data to Walrus...');
-      const blobId = await uploadToWalrus(encryptedData);
+      setUploadProgress('上传加密数据到Walrus...');
       
-      console.log('Uploaded to Walrus, blob ID:', blobId);
+      const response = await fetch(getPublisherUrl(`/blobs?epochs=${NUM_EPOCH}`), {
+        method: 'PUT',
+        body: encryptedData,
+      });
+
+      if (!response.ok) {
+        // 尝试切换到另一个服务
+        const currentIndex = walrusServices.findIndex(s => s.id === selectedWalrusService);
+        const nextService = walrusServices[(currentIndex + 1) % walrusServices.length];
+        setSelectedWalrusService(nextService.id);
+        
+        throw new Error('Walrus上传失败，请尝试使用不同的服务');
+      }
+
+      const result = await response.json();
+      console.log('Walrus上传响应:', result);
+      
+      // 根据返回格式提取 blob ID
+      let blobId: string;
+      if ('alreadyCertified' in result) {
+        blobId = result.alreadyCertified.blobId;
+        console.log('Blob已认证:', blobId);
+      } else if ('newlyCreated' in result) {
+        blobId = result.newlyCreated.blobObject.blobId;
+        console.log('新Blob创建:', blobId);
+      } else {
+        throw new Error('Walrus返回意外的响应格式');
+      }
 
       // 5. 提交到链上
       setUploadingStep('submitting');
-      setUploadProgress('Recording on blockchain...');
+      setUploadProgress('记录到区块链...');
       
       const tx = new Transaction();
       
       // 准备参数
       const blobIdBytes = Array.from(new TextEncoder().encode(blobId));
-      const sealKeyIdBytes = Array.from(new TextEncoder().encode(sealKeyId));
+      const sealKeyIdBytes = Array.from(new TextEncoder().encode(id));  // 存储hex字符串
       
-      // 调用合约
       tx.moveCall({
         target: `${ConfigService.getPackageId()}::survey_system::submit_answer_entry`,
         arguments: [
@@ -426,34 +405,32 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
         { transaction: tx },
         {
           onSuccess: (result) => {
-            console.log('Transaction result:', result);
+            console.log('交易结果:', result);
             
-            // 保存到 localStorage
+            // 保存记录
             const answeredSurveys = JSON.parse(localStorage.getItem('answered_surveys') || '[]');
             if (!answeredSurveys.includes(survey.id)) {
               answeredSurveys.push(survey.id);
               localStorage.setItem('answered_surveys', JSON.stringify(answeredSurveys));
             }
             
-            // 保存答案记录
             const answerRecord = {
               surveyId: survey.id,
               blobId,
-              sealKeyId,
+              sealKeyId: id,  // 存储hex格式
               timestamp: Date.now(),
               txDigest: result.digest,
               consent: consentForSubscription
             };
             localStorage.setItem(`survey_answer_${survey.id}`, JSON.stringify(answerRecord));
             
-            // 成功提示
             const reward = (parseInt(survey.rewardPerResponse) / 1000000000).toFixed(3);
             alert(
-              `🎉 Survey Submitted Successfully!\n\n` +
-              `You have earned ${reward} SUI!\n` +
-              `Transaction: ${result.digest}\n` +
+              `🎉 问卷提交成功！\n\n` +
+              `您已获得 ${reward} SUI！\n` +
+              `交易哈希: ${result.digest}\n` +
               `Blob ID: ${blobId}\n\n` +
-              `Your answers have been encrypted and stored on Walrus.`
+              `您的答案已加密并存储在Walrus上。`
             );
             
             setHasAnswered(true);
@@ -463,15 +440,15 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
             }
           },
           onError: (error) => {
-            console.error('Transaction error:', error);
-            alert(`Failed to submit: ${error.message || 'Unknown error'}`);
+            console.error('交易错误:', error);
+            alert(`提交失败: ${error.message || '未知错误'}`);
           }
         }
       );
       
     } catch (error: any) {
-      console.error('Error submitting answers:', error);
-      alert(`Error: ${error.message || 'Failed to submit answers'}`);
+      console.error('提交答案错误:', error);
+      alert(`错误: ${error.message || '提交答案失败'}`);
     } finally {
       setSubmitting(false);
       setUploadingStep('idle');
@@ -489,7 +466,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
       <Card>
         <Flex justify="center" align="center" py="5">
           <Spinner />
-          <Text ml="2">Loading survey...</Text>
+          <Text ml="2">加载问卷中...</Text>
         </Flex>
       </Card>
     );
@@ -499,10 +476,10 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
     return (
       <Card>
         <Flex direction="column" align="center" gap="3" py="5">
-          <Text size="4">Survey not found</Text>
+          <Text size="4">未找到问卷</Text>
           {onBack && (
             <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> Back to Surveys
+              <ChevronLeft size={16} /> 返回问卷列表
             </Button>
           )}
         </Flex>
@@ -515,11 +492,11 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
       <Card>
         <Flex direction="column" align="center" gap="3" py="5">
           <CheckCircle size={48} color="green" />
-          <Text size="4" weight="bold">You have already answered this survey</Text>
-          <Text size="2" color="gray">Thank you for your participation!</Text>
+          <Text size="4" weight="bold">您已经回答过这个问卷</Text>
+          <Text size="2" color="gray">感谢您的参与！</Text>
           {onBack && (
             <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> Back to Surveys
+              <ChevronLeft size={16} /> 返回问卷列表
             </Button>
           )}
         </Flex>
@@ -532,10 +509,10 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
       <Card>
         <Flex direction="column" align="center" gap="3" py="5">
           <AlertCircle size={48} color="orange" />
-          <Text size="4" weight="bold">Survey is no longer active</Text>
+          <Text size="4" weight="bold">问卷已经关闭</Text>
           {onBack && (
             <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> Back to Surveys
+              <ChevronLeft size={16} /> 返回问卷列表
             </Button>
           )}
         </Flex>
@@ -567,7 +544,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
           <div>
             <Flex justify="between" mb="2">
               <Text size="2" color="gray">
-                Question {currentQuestionIndex + 1} of {survey.questions.length}
+                问题 {currentQuestionIndex + 1} / {survey.questions.length}
               </Text>
               <Text size="2" weight="bold">{progress.toFixed(0)}%</Text>
             </Flex>
@@ -598,8 +575,8 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
               currentQuestion.question_type === 0 ? 'blue' :
               currentQuestion.question_type === 1 ? 'green' : 'purple'
             }>
-              {currentQuestion.question_type === 0 ? 'Single Choice' :
-               currentQuestion.question_type === 1 ? 'Multiple Choice' : 'Text Answer'}
+              {currentQuestion.question_type === 0 ? '单选' :
+               currentQuestion.question_type === 1 ? '多选' : '文本'}
             </Badge>
           </Flex>
           
@@ -644,7 +621,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
           
           {currentQuestion.question_type === 2 && (
             <TextArea
-              placeholder="Type your answer here..."
+              placeholder="请输入您的答案..."
               value={currentAnswer as string}
               onChange={(e) => handleTextAnswer(e.target.value)}
               rows={4}
@@ -660,11 +637,11 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
             <Flex align="center" justify="between">
               <div style={{ flex: 1 }}>
                 <Text size="2" weight="bold">
-                  Data Sharing Consent
+                  数据共享同意
                 </Text>
                 <Text size="1" color="gray">
-                  Allow your encrypted answers to be accessed by subscribers for analytics.
-                  You'll receive dividends from subscription revenue if you consent.
+                  允许订阅者访问您的加密答案用于分析。
+                  如果您同意，将从订阅收入中获得分红。
                 </Text>
               </div>
               <Switch
@@ -676,7 +653,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
 
           <Card>
             <Flex direction="column" gap="2">
-              <Text size="2" weight="bold">Select Walrus Service:</Text>
+              <Text size="2" weight="bold">选择Walrus服务:</Text>
               <select
                 value={selectedWalrusService}
                 onChange={(e) => setSelectedWalrusService(e.target.value)}
@@ -689,7 +666,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
                 ))}
               </select>
               <Text size="1" color="gray">
-                If upload fails, try a different service
+                如果上传失败，请尝试其他服务
               </Text>
             </Flex>
           </Card>
@@ -705,12 +682,12 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
             disabled={currentQuestionIndex === 0}
           >
             <ChevronLeft size={16} />
-            Previous
+            上一题
           </Button>
           
           {!isLastQuestion ? (
             <Button onClick={saveAndNext}>
-              Next
+              下一题
               <ChevronRight size={16} />
             </Button>
           ) : (
@@ -723,12 +700,12 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
               {submitting ? (
                 <Flex align="center" gap="2">
                   <Spinner />
-                  <Text>{uploadProgress || 'Processing...'}</Text>
+                  <Text>{uploadProgress || '处理中...'}</Text>
                 </Flex>
               ) : (
                 <>
                   <Send size={16} style={{ marginRight: '8px' }} />
-                  Submit & Earn {formatSUI(survey.rewardPerResponse)} SUI
+                  提交并获得 {formatSUI(survey.rewardPerResponse)} SUI
                 </>
               )}
             </Button>

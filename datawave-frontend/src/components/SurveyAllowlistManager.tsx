@@ -292,14 +292,48 @@ export function SurveyAllowlistManager({ surveyId, onBack }: SurveyAllowlistMana
     }
   };
 
-  useEffect(() => {
-    loadSurveyData();
-    loadOrCreateSessionKey();
-  }, [surveyId, currentAccount?.address]);
+  // 创建新的 Session Key
+  const createNewSessionKey = async () => {
+    if (!currentAccount?.address || !signPersonalMessage) {
+      console.error('Missing account or signPersonalMessage');
+      return;
+    }
+    
+    setIsCreatingSession(true);
+    console.log('Creating new session key...');
+    
+    try {
+      const sessionKey = await SessionKey.fromPersonalMessage(
+        currentAccount.address,
+        async (message) => {
+          const { signature } = await signPersonalMessage({
+            message: new TextEncoder().encode(message)
+          });
+          return signature;
+        },
+        10  // TTL in minutes
+      );
+      
+      setSessionKey(sessionKey);
+      
+      // 保存到 IndexedDB
+      const exported = sessionKey.export();
+      await set('sessionKey', exported);
+      console.log('New session key created and saved');
+      
+    } catch (error) {
+      console.error('Error creating session key:', error);
+    } finally {
+      setIsCreatingSession(false);
+    }
+  };
 
   // 创建或加载 Session Key
   const loadOrCreateSessionKey = async () => {
     if (!currentAccount?.address) return;
+    
+    // 防止重复创建
+    if (isCreatingSession || sessionKey) return;
     
     try {
       // 尝试从 IndexedDB 加载现有的 session key
@@ -307,7 +341,7 @@ export function SurveyAllowlistManager({ surveyId, onBack }: SurveyAllowlistMana
       if (exportedKey) {
         try {
           const imported = SessionKey.import(exportedKey as any);
-          // 检查是否过期
+          // 检查是否过期且地址匹配
           if (imported.getAddress() === currentAccount.address) {
             setSessionKey(imported);
             console.log('Loaded existing session key');
@@ -318,45 +352,62 @@ export function SurveyAllowlistManager({ surveyId, onBack }: SurveyAllowlistMana
         }
       }
       
-      // 创建新的 session key
+      // 创建新的 session key（如果没有或已过期）
       await createNewSessionKey();
     } catch (error) {
       console.error('Error loading session key:', error);
     }
   };
 
+  useEffect(() => {
+    // 使用 flag 防止重复执行
+    let mounted = true;
+    
+    const loadData = async () => {
+      if (!mounted) return;
+      await loadSurveyData();
+      if (!mounted) return;
+      await loadOrCreateSessionKey();
+    };
+    
+    if (surveyId && currentAccount?.address) {
+      loadData();
+    }
+    
+    return () => {
+      mounted = false;
+    };
+  }, [surveyId, currentAccount?.address]);
+
   // 创建新的 Session Key
   const createNewSessionKey = async () => {
-    if (!currentAccount?.address) return;
+    if (!currentAccount?.address || !signPersonalMessage) {
+      console.error('Missing account or signPersonalMessage');
+      return;
+    }
     
     setIsCreatingSession(true);
+    console.log('Creating new session key...');
+    
     try {
-      const newSessionKey = await SessionKey.create({
-        address: currentAccount.address,
-        packageId: ConfigService.getPackageId(),
-        ttlMin: TTL_MIN,
-        suiClient,
-      });
-
-      // 签名个人消息
-      signPersonalMessage(
-        {
-          message: newSessionKey.getPersonalMessage(),
+      const sessionKey = await SessionKey.fromPersonalMessage(
+        currentAccount.address,
+        async (message) => {
+          const { signature } = await signPersonalMessage({
+            message: new TextEncoder().encode(message)
+          });
+          return signature;
         },
-        {
-          onSuccess: async (result) => {
-            await newSessionKey.setPersonalMessageSignature(result.signature);
-            setSessionKey(newSessionKey);
-            
-            // 保存到 IndexedDB
-            await set('sessionKey', newSessionKey.export());
-            console.log('Created new session key');
-          },
-          onError: (error) => {
-            console.error('Failed to sign session key:', error);
-          }
-        }
+        TTL_MIN  // TTL in minutes
       );
+      
+      setSessionKey(sessionKey);
+      
+      // 保存到 IndexedDB
+      const exported = sessionKey.export();
+      await set('sessionKey', exported);
+      console.log('New session key created and saved');
+      
     } catch (error) {
       console.error('Error creating session key:', error);
     } finally {
@@ -540,6 +591,12 @@ export function SurveyAllowlistManager({ surveyId, onBack }: SurveyAllowlistMana
       return;
     }
     
+    // 防止重复点击
+    if (decryptingBlobId === blob.blobId) {
+      console.log('Already decrypting this blob');
+      return;
+    }
+    
     setDecryptingBlobId(blob.blobId);
     console.log('Starting decryption for blob:', blob);
     
@@ -576,7 +633,7 @@ export function SurveyAllowlistManager({ surveyId, onBack }: SurveyAllowlistMana
         throw new Error('Failed to download blob from Walrus');
       }
       
-      // 2. 从加密数据解析 ID（与仓库代码一致）
+      // 2. 从加密数据解析 ID
       const encryptedObject = EncryptedObject.parse(new Uint8Array(encryptedData));
       const fullId = encryptedObject.id;
       // 将 Uint8Array 转换为 hex string
@@ -585,32 +642,15 @@ export function SurveyAllowlistManager({ surveyId, onBack }: SurveyAllowlistMana
         .join('');
       console.log('Parsed ID from encrypted object:', idHex);
       
-      // 验证 ID 前缀是否匹配 survey ID
-      const surveyIdHex = surveyId.replace(/^0x/, '');
-      const idPrefix = idHex.substring(0, surveyIdHex.length);
-      console.log('ID prefix validation:', {
-        fullIdLength: idHex.length,
-        surveyId: surveyId,
-        surveyIdHex: surveyIdHex,
-        surveyIdLength: surveyIdHex.length,
-        extractedPrefix: idPrefix,
-        prefixMatches: idPrefix === surveyIdHex,
-        fullIdHex: idHex
-      });
-      
-      if (idPrefix !== surveyIdHex) {
-        console.error('WARNING: ID prefix does not match survey ID!');
-        console.error('This may cause seal_approve_allowlist to fail');
-      }
-      
       // 3. 构建交易以获取解密权限
       const tx = new Transaction();
       constructMoveCall(tx, idHex);
       const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
       console.log('Transaction built for seal_approve_allowlist');
       
-      // 4. 获取解密密钥
+      // 4. 获取解密密钥（只调用一次）
       console.log('Fetching decryption keys...');
+      let keysFetched = false;
       try {
         await sealClient.fetchKeys({ 
           ids: [fullId], 
@@ -618,6 +658,7 @@ export function SurveyAllowlistManager({ surveyId, onBack }: SurveyAllowlistMana
           sessionKey, 
           threshold: 2 
         });
+        keysFetched = true;
         console.log('Keys fetched successfully');
       } catch (fetchError) {
         console.error('Error fetching keys:', fetchError);
@@ -627,33 +668,35 @@ export function SurveyAllowlistManager({ surveyId, onBack }: SurveyAllowlistMana
         throw fetchError;
       }
       
-      // 5. 解密数据
-      console.log('Decrypting data...');
-      const decryptedData = await sealClient.decrypt({
-        data: new Uint8Array(encryptedData),
-        sessionKey,
-        txBytes,
-      });
-      console.log('Data decrypted successfully, size:', decryptedData.byteLength);
-      
-      // 6. 解析 JSON 数据
-      const answerJson = new TextDecoder().decode(decryptedData);
-      const answerData = JSON.parse(answerJson);
-      console.log('Parsed answer data:', answerData);
-      
-      // 保存解密的答案
-      decryptedAnswers.set(blob.blobId, answerData);
-      setDecryptedAnswers(new Map(decryptedAnswers));
-      
-      // 显示解密的答案
-      setCurrentDecryptedAnswer(answerData);
-      setShowDecryptedDialog(true);
+      // 5. 解密数据（只有在成功获取密钥后）
+      if (keysFetched) {
+        console.log('Decrypting data...');
+        const decryptedData = await sealClient.decrypt({
+          data: new Uint8Array(encryptedData),
+          sessionKey,
+          txBytes,
+        });
+        console.log('Data decrypted successfully, size:', decryptedData.byteLength);
+        
+        // 6. 解析 JSON 数据
+        const answerJson = new TextDecoder().decode(decryptedData);
+        const answerData = JSON.parse(answerJson);
+        console.log('Parsed answer data:', answerData);
+        
+        // 保存解密的答案
+        decryptedAnswers.set(blob.blobId, answerData);
+        setDecryptedAnswers(new Map(decryptedAnswers));
+        
+        // 显示解密的答案
+        setCurrentDecryptedAnswer(answerData);
+        setShowDecryptedDialog(true);
+        
+        alert('Answer decrypted successfully!');
+      }
       
     } catch (error: any) {
       console.error('Error decrypting answer:', error);
       if (error.message?.includes('No access')) {
-        alert('No access to decrypt this answer. Make sure you are in the allowlist.');
-      } else if (error instanceof NoAccessError) {
         alert('No access to decrypt this answer. Make sure you are in the allowlist.');
       } else {
         alert(`Failed to decrypt answer: ${error.message || 'Unknown error'}`);

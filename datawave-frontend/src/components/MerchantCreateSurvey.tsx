@@ -200,7 +200,7 @@ export function MerchantCreateSurveyOptimized() {
         ],
       });
       
-      tx.setGasBudget(10000000000);
+      tx.setGasBudget(1000000000);
       
       // 执行交易
       const result = await signAndExecute({ transaction: tx as any});

@@ -2,10 +2,10 @@
 
 export class ConfigService {
   // Contract addresses (will be updated after deployment)
-  private static readonly PACKAGE_ID = "0xb679ca5e580e26df21b7d08fc0036ec2355adcd47d644d8655b724f15f105ae1"; // Your deployed package ID
-  private static readonly SURVEY_REGISTRY_ID = "0x4a417b37577a47cc302bf601aa1519740bee359e2a63ed81643a185492353541"; // To be set after deployment
-  private static readonly PLATFORM_TREASURY_ID = "0x0a1559771fa97c17b834390633d34073560b70e6fe0a48ee293508bba7d7be06"; // To be set after deployment
-  private static readonly ADMIN_CAP_ID = "0x3a8ac2d5465657e6f2815f4c50a7228ba8667a8705c432884ea4719522259cb7"; // To be set after deployment
+  private static readonly PACKAGE_ID = "0x6c09c0ae83642b38b997407b623e29e8b8066b9e68adf9d3129a7d78278ea6df"; // Your deployed package ID
+  private static readonly SURVEY_REGISTRY_ID = "0x2485402b17b658016c586dc2e989d4acc9adc0d931650b679261c3dc9d16c8b6"; // To be set after deployment
+  private static readonly PLATFORM_TREASURY_ID = "0xb2d90b553f66ee1e39d8776c8a8c95edc273e46bdd6d8120404017c447cb8e91"; // To be set after deployment
+  private static readonly ADMIN_CAP_ID = "0x745818380d1be4ce731c405327a836b8a25a3c38e0d6c927019c15560ffd5997"; // To be set after deployment
   
   // Network configuration
   private static readonly NETWORK = "testnet";

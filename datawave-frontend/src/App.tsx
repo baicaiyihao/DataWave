@@ -4,10 +4,10 @@ import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
 import { Box, Container, Flex, Card, Text, Tabs, Button, Badge } from '@radix-ui/themes';
 import { MerchantCreateSurveyOptimized } from './components/MerchantCreateSurvey';
 import { ViewSurveyDetails } from './components/ViewSurveyDetails';
-import { ViewAllSurveys } from './components/Viewallsurveys';
+import { ViewAllSurveys } from './components/ViewAllSurveys';
 import { MySurveys } from './components/MySurveys';
 import { AnswerSurveyWithSeal } from './components/AnswerSurveyWithSeal';
-import { SurveyAllowlistManager } from './components/SurveyAllowlistManager';
+import { SurveyDecryption } from './components/SurveyDecryption';
 import { ConfigService } from './services/config';
 import { 
   PlusCircle, 
@@ -197,9 +197,9 @@ function App() {
           {/* Manage Allowlist Tab */}
           <Tabs.Content value="manage-allowlist">
             {currentAccount && selectedSurveyId ? (
-              <SurveyAllowlistManager 
+              <SurveyDecryption 
                 surveyId={selectedSurveyId} 
-                onBack={handleBackFromManage}
+                isCreator={true}
               />
             ) : (
               <Card>

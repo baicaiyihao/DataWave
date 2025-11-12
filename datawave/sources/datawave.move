@@ -23,6 +23,13 @@ const ESubscriptionExpired: u64 = 6;
 const ESurveyNotActive: u64 = 7;
 const EDuplicateInAllowlist: u64 = 9;
 
+const EInvalidNamespace: u64 = 10;  // ID前缀不匹配
+const ECallerNotInAllowlist: u64 = 11;  // 调用者不在allowlist中
+const EInvalidSubscriptionOwner: u64 = 12;  // 订阅所有者不匹配
+const EInvalidServiceId: u64 = 13;  // Service ID不匹配
+const EInvalidSurveyId: u64 = 14;  // Survey ID不匹配
+
+
 // Marker for blob storage (following Seal demo pattern)
 const MARKER: u64 = 3;
 
@@ -552,12 +559,11 @@ public fun seal_approve_allowlist(
     
     // Check if the id has the right prefix (survey_id)
     let namespace = survey_namespace(survey);
-    assert!(is_prefix(namespace, id), ENotInAllowlist);
+    assert!(is_prefix(namespace, id), EInvalidNamespace);  // Error 10
     
     // Check if user is in allowlist
-    assert!(vec_set::contains(&survey.allowlist, &caller), ENotInAllowlist);
+    assert!(vec_set::contains(&survey.allowlist, &caller), ECallerNotInAllowlist);  // Error 11
 }
-
 /// Check if subscription is valid for accessing survey answers
 /// Key format: [survey_id][nonce] - matches Seal demo pattern
 public fun seal_approve_subscription(
@@ -571,19 +577,21 @@ public fun seal_approve_subscription(
     let caller = ctx.sender();
     
     // Verify subscription ownership
-    assert!(subscription.subscriber == caller, ENotInAllowlist);
+    assert!(subscription.subscriber == caller, EInvalidSubscriptionOwner);  // Error 12
     
-    // Verify subscription matches service and survey
-    assert!(subscription.service_id == object::id(service), ESubscriptionExpired);
-    assert!(subscription.survey_id == object::id(survey), ESurveyNotFound);
-    assert!(service.survey_id == object::id(survey), ESurveyNotFound);
+    // Verify subscription matches service
+    assert!(subscription.service_id == object::id(service), EInvalidServiceId);  // Error 13
+    
+    // Verify survey IDs match
+    assert!(subscription.survey_id == object::id(survey), EInvalidSurveyId);  // Error 14
+    assert!(service.survey_id == object::id(survey), EInvalidSurveyId);  // Error 14
     
     // Check if subscription is still valid
-    assert!(clock::timestamp_ms(clock) < subscription.expires_at, ESubscriptionExpired);
+    assert!(clock::timestamp_ms(clock) < subscription.expires_at, ESubscriptionExpired);  // Error 6
     
     // Check if the id has the right prefix (survey_id)
     let namespace = survey_namespace(survey);
-    assert!(is_prefix(namespace, id), ENotInAllowlist);
+    assert!(is_prefix(namespace, id), EInvalidNamespace);  // Error 10
 }
 
 // ======== Helper Functions ========
@@ -911,4 +919,225 @@ entry fun purchase_subscription_entry(
         ctx
     );
     transfer::transfer(subscription, ctx.sender());
+}
+
+// ======== Enhanced View Functions ========
+
+
+/// Get survey full details including questions
+public fun get_survey_full_details(survey: &Survey): (
+    String,      // title
+    String,      // description  
+    String,      // category
+    u64,         // reward_per_response
+    u64,         // max_responses
+    u64,         // current_responses
+    bool,        // is_active
+    u64,         // created_at
+    vector<Question> // questions
+) {
+    (
+        survey.title,
+        survey.description,
+        survey.category,
+        survey.reward_per_response,
+        survey.max_responses,
+        survey.current_responses,
+        survey.is_active,
+        survey.created_at,
+        survey.questions
+    )
+}
+
+/// Get registry statistics
+public fun get_registry_stats(registry: &SurveyRegistry): (u64, u64, u64) {
+    (
+        registry.total_surveys,
+        registry.total_responses,
+        registry.total_rewards_distributed
+    )
+}
+
+/// Check if user can answer survey
+public fun can_user_answer(
+    survey: &Survey,
+    user: address
+): bool {
+    survey.is_active && 
+    survey.current_responses < survey.max_responses &&
+    !table::contains(&survey.respondents, user)
+}
+
+/// Get survey reward details
+public fun get_survey_rewards(survey: &Survey): (
+    u64,  // reward_per_response
+    u64,  // total_reward_pool (max_responses * reward_per_response)
+    u64,  // distributed_rewards (current_responses * reward_per_response)
+    u64   // remaining_rewards
+) {
+    let total_pool = survey.max_responses * survey.reward_per_response;
+    let distributed = survey.current_responses * survey.reward_per_response;
+    let remaining = total_pool - distributed;
+    
+    (
+        survey.reward_per_response,
+        total_pool,
+        distributed,
+        remaining
+    )
+}
+
+/// Get survey timestamps
+public fun get_survey_timestamps(survey: &Survey): (u64, u64) {
+    (survey.created_at, survey.updated_at)
+}
+
+/// Get survey creator
+public fun get_survey_creator(survey: &Survey): address {
+    survey.creator
+}
+
+/// Check if survey accepts new responses
+public fun is_survey_accepting_responses(survey: &Survey): bool {
+    survey.is_active && survey.current_responses < survey.max_responses
+}
+
+/// Get survey completion percentage (returns basis points, e.g., 5000 = 50%)
+public fun get_survey_completion_rate(survey: &Survey): u64 {
+    if (survey.max_responses == 0) {
+        return 0
+    };
+    (survey.current_responses * 10000) / survey.max_responses
+}
+
+/// Get consent statistics
+public fun get_consent_stats(survey: &Survey): (u64, u64) {
+    // (consenting_users_count, consent_percentage in basis points)
+    let consent_rate = if (survey.current_responses > 0) {
+        (survey.consenting_users_count * 10000) / survey.current_responses
+    } else {
+        0
+    };
+    
+    (survey.consenting_users_count, consent_rate)
+}
+
+/// Get survey allowlist info
+public fun get_allowlist_info(survey: &Survey): (u64, bool, address) {
+    // (allowlist_size, creator_in_allowlist, creator_address)
+    let size = vec_set::length(&survey.allowlist);
+    let creator_in_list = vec_set::contains(&survey.allowlist, &survey.creator);
+    
+    (size, creator_in_list, survey.creator)
+}
+
+/// Get subscription service info
+public fun get_subscription_info(service: &SubscriptionService): (
+    ID,     // survey_id
+    u64,    // price
+    u64,    // duration_ms
+    u64,    // total_revenue
+    address // creator
+) {
+    (
+        service.survey_id,
+        service.price,
+        service.duration_ms,
+        service.total_revenue,
+        service.creator
+    )
+}
+
+/// Check if subscription is valid
+public fun is_subscription_valid(
+    subscription: &Subscription,
+    clock: &Clock
+): bool {
+    clock::timestamp_ms(clock) < subscription.expires_at
+}
+
+/// Get subscription details
+public fun get_subscription_details(subscription: &Subscription): (
+    ID,      // service_id
+    ID,      // survey_id
+    address, // subscriber
+    u64,     // created_at
+    u64,     // expires_at
+    bool     // is_expired (needs clock in actual implementation)
+) {
+    (
+        subscription.service_id,
+        subscription.survey_id,
+        subscription.subscriber,
+        subscription.created_at,
+        subscription.expires_at,
+        false // Would need clock to determine
+    )
+}
+
+/// Get platform treasury info
+public fun get_treasury_info(treasury: &PlatformTreasury): (u64, u64) {
+    // (total_fees_collected, platform_fee_rate)
+    (treasury.total_fees, treasury.platform_fee_rate)
+}
+
+/// Calculate platform fee for a given amount
+public fun calculate_platform_fee(
+    treasury: &PlatformTreasury,
+    amount: u64
+): u64 {
+    (amount * treasury.platform_fee_rate) / 10000
+}
+
+/// Check if survey is in active registry
+public fun is_survey_active_in_registry(
+    registry: &SurveyRegistry,
+    survey_id: ID
+): bool {
+    table::contains(&registry.active_surveys, survey_id)
+}
+
+/// Get question details
+public fun get_question_details(question: &Question): (String, u8, vector<String>) {
+    (question.question_text, question.question_type, question.options)
+}
+
+/// Get encrypted answer blob details
+public fun get_answer_blob_details(blob: &EncryptedAnswerBlob): (
+    address,  // respondent
+    String,   // blob_id
+    String,   // seal_key_id
+    u64,      // submitted_at
+    bool      // consent_for_subscription
+) {
+    (
+        blob.respondent,
+        blob.blob_id,
+        blob.seal_key_id,
+        blob.submitted_at,
+        blob.consent_for_subscription
+    )
+}
+
+// ======== Entry Functions for View Operations ========
+
+/// Entry function to check if user answered (returns via event)
+entry fun check_if_answered_entry(
+    survey: &Survey,
+    user: address
+) {
+    let answered = table::contains(&survey.respondents, user);
+    // In real implementation, emit an event with the result
+    event::emit(UserAnsweredCheck {
+        survey_id: object::id(survey),
+        user,
+        has_answered: answered
+    });
+}
+
+// ======== Event for query results ========
+public struct UserAnsweredCheck has copy, drop {
+    survey_id: ID,
+    user: address,
+    has_answered: bool,
 }

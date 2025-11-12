@@ -1,172 +1,369 @@
-// Copyright (c), Mysten Labs, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
-import React from 'react';
+// DataWave - Survey Platform with Tabs
+import React, { useState } from 'react';
 import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
-import { Box, Button, Card, Container, Flex, Grid } from '@radix-ui/themes';
-import { CreateAllowlist } from './CreateAllowlist';
-import { Allowlist } from './Allowlist';
-import WalrusUpload from './EncryptAndUpload';
-import { useState } from 'react';
-import { CreateService } from './CreateSubscriptionService';
-import FeedsToSubscribe from './SubscriptionView';
-import { Service } from './SubscriptionService';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { AllAllowlist } from './OwnedAllowlists';
-import { AllServices } from './OwnedSubscriptionServices';
-import Feeds from './AllowlistView';
-
-function LandingPage() {
-  return (
-    <Grid columns="2" gap="4">
-      <Card>
-        <Flex direction="column" gap="2" align="center" style={{ height: '100%' }}>
-          <div style={{ textAlign: 'center' }}>
-            <h2>Allowlist Example</h2>
-            <p>
-              Shows how a creator can define an allowlist based access. The creator first creates an
-              allowlist and can add or remove users in the list. The creator can then associate
-              encrypted files to the allowlist. Only users in the allowlist have access to decrypt
-              the files.
-            </p>
-          </div>
-          <Link to="/allowlist-example">
-            <Button size="3">Try it</Button>
-          </Link>
-        </Flex>
-      </Card>
-      <Card>
-        <Flex direction="column" gap="2" align="center" style={{ height: '100%' }}>
-          <div style={{ textAlign: 'center' }}>
-            <h2>Subscription Example</h2>
-            <p>
-              Shows how a creator can define a subscription based access to its published files. The
-              creator defines subcription fee and how long a subscription is valid for. The creator
-              can then associate encrypted files to the service. Only users who have purchased a
-              subscription (NFT) have access to decrypt the files, along with the condition that the
-              subscription must not have expired (i.e. the subscription creation timestamp plus the
-              TTL is smaller than the current clock time).
-            </p>
-          </div>
-          <Link to="/subscription-example">
-            <Button size="3">Try it</Button>
-          </Link>
-        </Flex>
-      </Card>
-    </Grid>
-  );
-}
+import { Box, Container, Flex, Card, Text, Tabs, Button, Badge } from '@radix-ui/themes';
+import { MerchantCreateSurveyOptimized } from './components/MerchantCreateSurvey';
+import { ViewSurveyDetails } from './components/ViewSurveyDetails';
+import { ViewAllSurveys } from './components/Viewallsurveys';
+import { MySurveys } from './components/MySurveys';
+import { AnswerSurveyWithSeal } from './components/AnswerSurveyWithSeal';
+import { SurveyAllowlistManager } from './components/SurveyAllowlistManager';
+import { ConfigService } from './services/config';
+import { 
+  PlusCircle, 
+  Search, 
+  List, 
+  FileText, 
+  Activity,
+  Database,
+  Grid
+} from 'lucide-react';
 
 function App() {
   const currentAccount = useCurrentAccount();
-  const [recipientAllowlist, setRecipientAllowlist] = useState<string>('');
-  const [capId, setCapId] = useState<string>('');
+  const [activeTab, setActiveTab] = useState('all-surveys');
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('');
+  
+  // 处理查看详情
+  const handleViewDetails = (surveyId: string) => {
+    setSelectedSurveyId(surveyId);
+    setActiveTab('view-details');
+  };
+  
+  // 处理返回列表
+  const handleBackToList = () => {
+    setActiveTab('all-surveys');
+    setSelectedSurveyId('');
+  };
+  
+  // 处理开始答题
+  const handleStartAnswer = (surveyId: string) => {
+    setSelectedSurveyId(surveyId);
+    setActiveTab('answer-survey');
+  };
+  
+  // 处理答题完成后返回
+  const handleBackFromAnswer = () => {
+    setActiveTab('view-details');
+  };
+  
+  // 处理管理 allowlist
+  const handleManageAllowlist = (surveyId: string) => {
+    setSelectedSurveyId(surveyId);
+    setActiveTab('manage-allowlist');
+  };
+  
+  // 处理从管理页面返回
+  const handleBackFromManage = () => {
+    setActiveTab('my-surveys');
+  };
+  
+  // 监听创建成功后的查看详情事件
+  React.useEffect(() => {
+    const handleViewSurveyEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail?.surveyId) {
+        handleViewDetails(customEvent.detail.surveyId);
+      }
+    };
+    
+    const handleStartAnswerEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail?.surveyId) {
+        handleStartAnswer(customEvent.detail.surveyId);
+      }
+    };
+    
+    const handleManageAllowlistEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail?.surveyId) {
+        handleManageAllowlist(customEvent.detail.surveyId);
+      }
+    };
+    
+    window.addEventListener('viewSurveyDetails', handleViewSurveyEvent);
+    window.addEventListener('startAnswerSurvey', handleStartAnswerEvent);
+    window.addEventListener('manageSurveyAllowlist', handleManageAllowlistEvent);
+    
+    return () => {
+      window.removeEventListener('viewSurveyDetails', handleViewSurveyEvent);
+      window.removeEventListener('startAnswerSurvey', handleStartAnswerEvent);
+      window.removeEventListener('manageSurveyAllowlist', handleManageAllowlistEvent);
+    };
+  }, []);
+  
   return (
-    <Container>
-      <Flex position="sticky" px="4" py="2" justify="between">
-        <h1 className="text-4xl font-bold m-4 mb-8">Seal Example Apps</h1>
-        {/* <p>TODO: add seal logo</p> */}
-        <Box>
-          <ConnectButton />
-        </Box>
-      </Flex>
+    <Container size="4">
+      {/* Header */}
       <Card style={{ marginBottom: '2rem' }}>
-        <p>
-          1. Code is available{' '}
-          <a href="https://github.com/MystenLabs/seal/tree/main/examples">here</a>.
-        </p>
-        <p>
-          2. These examples are for Testnet only. Make sure you wallet is set to Testnet and has
-          some balance (can request from <a href="https://faucet.sui.io/">faucet.sui.io</a>).
-        </p>
-        <p>
-          3. Blobs are only stored on Walrus Testnet for 1 epoch by default, older files cannot be
-          retrieved even if you have access.
-        </p>
-        <p>
-          4. Currently only image files are supported, and the UI is minimal, designed for demo
-          purposes only!
-        </p>
-        <p>
-          5. If you encounter issues when uploading to or reading from Walrus using the example
-          frontend, it usually means the public publisher and/or aggregator configured in
-          `vite.config.ts` is not available. This example does not guarantee performance and
-          downstream service quality and is only for demo purpose. In your own application, consider
-          running your own publisher and/or aggregator according to{' '}
-          <a href="https://docs.wal.app/operator-guide/aggregator.html#operating-an-aggregator-or-publisher">
-            the documentation
-          </a>
-          . Or consider choosing and monitoring other reliable public publisher and aggregator from{' '}
-          <a href="https://docs.wal.app/usage/web-api.html#public-services">the list</a>.
-        </p>
+        <Flex px="3" py="2" justify="between" align="center">
+          <Flex align="center" gap="3">
+            <Text size="6" weight="bold">🌊 DataWave</Text>
+            <Badge size="1" color="blue">Testnet</Badge>
+          </Flex>
+          <Flex align="center" gap="3">
+            {currentAccount && (
+              <Text size="2" color="gray">
+                {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
+              </Text>
+            )}
+            <ConnectButton />
+          </Flex>
+        </Flex>
       </Card>
-      {currentAccount ? (
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route
-              path="/allowlist-example/*"
-              element={
-                <Routes>
-                  <Route path="/" element={<CreateAllowlist />} />
-                  <Route
-                    path="/admin/allowlist/:id"
-                    element={
-                      <div>
-                        <Allowlist
-                          setRecipientAllowlist={setRecipientAllowlist}
-                          setCapId={setCapId}
-                        />
-                        <WalrusUpload
-                          policyObject={recipientAllowlist}
-                          cap_id={capId}
-                          moduleName="allowlist"
-                        />
-                      </div>
-                    }
-                  />
-                  <Route path="/admin/allowlists" element={<AllAllowlist />} />
-                  <Route
-                    path="/view/allowlist/:id"
-                    element={<Feeds suiAddress={currentAccount.address} />}
-                  />
-                </Routes>
-              }
+      
+      {/* Main Content */}
+      <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+        <Tabs.List size="2">
+          <Tabs.Trigger value="all-surveys">
+            <Grid size={16} style={{ marginRight: '8px' }} />
+            All Surveys
+          </Tabs.Trigger>
+          
+          <Tabs.Trigger value="my-surveys">
+            <FileText size={16} style={{ marginRight: '8px' }} />
+            My Surveys
+          </Tabs.Trigger>
+          
+          <Tabs.Trigger value="view-details">
+            <Search size={16} style={{ marginRight: '8px' }} />
+            Survey Details
+          </Tabs.Trigger>
+          
+          <Tabs.Trigger value="answer-survey">
+            <Activity size={16} style={{ marginRight: '8px' }} />
+            Answer Survey
+          </Tabs.Trigger>
+          
+          <Tabs.Trigger value="manage-allowlist">
+            <Grid size={16} style={{ marginRight: '8px' }} />
+            Manage Access
+          </Tabs.Trigger>
+          
+          <Tabs.Trigger value="create">
+            <PlusCircle size={16} style={{ marginRight: '8px' }} />
+            Create Survey
+          </Tabs.Trigger>
+          
+          <Tabs.Trigger value="debug">
+            <Database size={16} style={{ marginRight: '8px' }} />
+            Debug Info
+          </Tabs.Trigger>
+        </Tabs.List>
+        
+        <Box style={{ marginTop: '2rem' }}>
+          {/* All Surveys Tab */}
+          <Tabs.Content value="all-surveys">
+            <ViewAllSurveys onViewDetails={handleViewDetails} />
+          </Tabs.Content>
+          
+          {/* My Surveys Tab */}
+          <Tabs.Content value="my-surveys">
+            <MySurveys />
+          </Tabs.Content>
+          
+          {/* View Survey Details Tab */}
+          <Tabs.Content value="view-details">
+            <ViewSurveyDetails 
+              surveyId={selectedSurveyId} 
+              onBack={handleBackToList}
             />
-            <Route
-              path="/subscription-example/*"
-              element={
-                <Routes>
-                  <Route path="/" element={<CreateService />} />
-                  <Route
-                    path="/admin/service/:id"
-                    element={
-                      <div>
-                        <Service
-                          setRecipientAllowlist={setRecipientAllowlist}
-                          setCapId={setCapId}
-                        />
-                        <WalrusUpload
-                          policyObject={recipientAllowlist}
-                          cap_id={capId}
-                          moduleName="subscription"
-                        />
-                      </div>
-                    }
-                  />
-                  <Route path="/admin/services" element={<AllServices />} />
-                  <Route
-                    path="/view/service/:id"
-                    element={<FeedsToSubscribe suiAddress={currentAccount.address} />}
-                  />
-                </Routes>
-              }
-            />
-          </Routes>
-        </BrowserRouter>
-      ) : (
-        <p>Please connect your wallet to continue</p>
-      )}
+          </Tabs.Content>
+          
+          {/* Answer Survey Tab */}
+          <Tabs.Content value="answer-survey">
+            {currentAccount && selectedSurveyId ? (
+              <AnswerSurveyWithSeal 
+                surveyId={selectedSurveyId} 
+                onBack={handleBackFromAnswer}
+              />
+            ) : (
+              <Card>
+                <Flex direction="column" align="center" gap="3" py="5">
+                  <Text size="4" weight="bold">
+                    {!currentAccount ? 'Connect Wallet to Answer Survey' : 'Select a Survey'}
+                  </Text>
+                  <Text size="2" color="gray">
+                    {!currentAccount ? 
+                      'You need to connect your wallet to answer surveys' : 
+                      'Please select a survey from the list to answer'}
+                  </Text>
+                  {!currentAccount && <ConnectButton />}
+                </Flex>
+              </Card>
+            )}
+          </Tabs.Content>
+          
+          {/* Manage Allowlist Tab */}
+          <Tabs.Content value="manage-allowlist">
+            {currentAccount && selectedSurveyId ? (
+              <SurveyAllowlistManager 
+                surveyId={selectedSurveyId} 
+                onBack={handleBackFromManage}
+              />
+            ) : (
+              <Card>
+                <Flex direction="column" align="center" gap="3" py="5">
+                  <Text size="4" weight="bold">
+                    {!currentAccount ? 'Connect Wallet' : 'Select a Survey'}
+                  </Text>
+                  <Text size="2" color="gray">
+                    {!currentAccount ? 
+                      'Connect your wallet to manage survey access' : 
+                      'Select a survey from My Surveys to manage access'}
+                  </Text>
+                  {!currentAccount && <ConnectButton />}
+                </Flex>
+              </Card>
+            )}
+          </Tabs.Content>
+          
+          {/* Create Survey Tab */}
+          <Tabs.Content value="create">
+            {currentAccount ? (
+              <MerchantCreateSurveyOptimized />
+            ) : (
+              <Card>
+                <Flex direction="column" align="center" gap="3" py="5">
+                  <Text size="4" weight="bold">Connect Wallet to Create Survey</Text>
+                  <Text size="2" color="gray">You need to connect your wallet to create a survey</Text>
+                  <ConnectButton />
+                </Flex>
+              </Card>
+            )}
+          </Tabs.Content>
+          
+          {/* Debug Tab */}
+          <Tabs.Content value="debug">
+            <Card>
+              <Flex direction="column" gap="3">
+                <Text size="4" weight="bold">Debug Information</Text>
+                
+                <Card style={{ backgroundColor: 'var(--gray-2)' }}>
+                  <Flex direction="column" gap="2">
+                    <Text size="2" weight="bold">Contract Addresses</Text>
+                    <Text size="1" style={{ fontFamily: 'monospace' }}>
+                      Package ID: {ConfigService.getPackageId()}
+                    </Text>
+                    <Text size="1" style={{ fontFamily: 'monospace' }}>
+                      Registry: {ConfigService.getSurveyRegistryId()}
+                    </Text>
+                    <Text size="1" style={{ fontFamily: 'monospace' }}>
+                      Treasury: {ConfigService.getPlatformTreasuryId()}
+                    </Text>
+                  </Flex>
+                </Card>
+                
+                <Card style={{ backgroundColor: 'var(--gray-2)' }}>
+                  <Flex direction="column" gap="2">
+                    <Text size="2" weight="bold">Current Survey ID</Text>
+                    {selectedSurveyId ? (
+                      <Text size="1" style={{ fontFamily: 'monospace' }}>
+                        {selectedSurveyId}
+                      </Text>
+                    ) : (
+                      <Text size="1" color="gray">No survey selected</Text>
+                    )}
+                  </Flex>
+                </Card>
+                
+                <Card style={{ backgroundColor: 'var(--gray-2)' }}>
+                  <Flex direction="column" gap="2">
+                    <Text size="2" weight="bold">Local Storage Data</Text>
+                    <Flex gap="2">
+                      <Button 
+                        size="2" 
+                        variant="soft"
+                        onClick={() => {
+                          const surveyIndex = localStorage.getItem('survey_index');
+                          if (surveyIndex) {
+                            const ids = JSON.parse(surveyIndex);
+                            console.log('Survey Index:', ids);
+                            ids.forEach((id: string) => {
+                              const data = localStorage.getItem(`survey_${id}`);
+                              if (data) {
+                                console.log(`Survey ${id}:`, JSON.parse(data));
+                              }
+                            });
+                          }
+                          const keys = Object.keys(localStorage);
+                          console.log('All localStorage keys:', keys);
+                          keys.forEach(key => {
+                            console.log(`${key}:`, localStorage.getItem(key));
+                          });
+                          alert('Check console for localStorage data');
+                        }}
+                      >
+                        View Storage
+                      </Button>
+                      <Button 
+                        size="2" 
+                        variant="soft" 
+                        color="red"
+                        onClick={() => {
+                          if (confirm('Clear all localStorage data?')) {
+                            localStorage.clear();
+                            alert('LocalStorage cleared');
+                          }
+                        }}
+                      >
+                        Clear Storage
+                      </Button>
+                    </Flex>
+                  </Flex>
+                </Card>
+                
+                <Card style={{ backgroundColor: 'var(--gray-2)' }}>
+                  <Flex direction="column" gap="2">
+                    <Text size="2" weight="bold">Connected Account</Text>
+                    {currentAccount ? (
+                      <>
+                        <Text size="1" style={{ fontFamily: 'monospace' }}>
+                          Address: {currentAccount.address}
+                        </Text>
+                        <Text size="1">
+                          Label: {currentAccount.label || 'N/A'}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text size="1" color="gray">Not connected</Text>
+                    )}
+                  </Flex>
+                </Card>
+                
+                <Card style={{ backgroundColor: 'var(--gray-2)' }}>
+                  <Flex direction="column" gap="2">
+                    <Text size="2" weight="bold">Quick Links</Text>
+                    <Flex gap="2" wrap="wrap">
+                      <Button
+                        size="1"
+                        variant="soft"
+                        onClick={() => window.open('https://suiscan.xyz/testnet', '_blank')}
+                      >
+                        Sui Explorer
+                      </Button>
+                      <Button
+                        size="1"
+                        variant="soft"
+                        onClick={() => window.open('https://testnet.suivision.xyz', '_blank')}
+                      >
+                        SuiVision
+                      </Button>
+                      <Button
+                        size="1"
+                        variant="soft"
+                        onClick={() => window.open('https://discord.com/invite/Sui', '_blank')}
+                      >
+                        Sui Discord
+                      </Button>
+                    </Flex>
+                  </Flex>
+                </Card>
+              </Flex>
+            </Card>
+          </Tabs.Content>
+        </Box>
+      </Tabs.Root>
     </Container>
   );
 }

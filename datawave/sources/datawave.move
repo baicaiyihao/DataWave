@@ -690,6 +690,28 @@ public fun get_category_surveys(registry: &SurveyRegistry, category: String): ve
     }
 }
 
+/// Add questions to a survey (can only be done before any answers)
+public fun add_questions(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    questions: vector<Question>,
+    clock: &Clock,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidOwner);
+    // Only allow adding questions if no one has answered yet
+    assert!(survey.current_responses == 0, EAlreadyAnswered);
+    
+    // Add questions to the survey
+    let mut i = 0;
+    while (i < vector::length(&questions)) {
+        let question = *vector::borrow(&questions, i);
+        vector::push_back(&mut survey.questions, question);
+        i = i + 1;
+    };
+    
+    survey.updated_at = clock::timestamp_ms(clock);
+}
+
 // ======== Admin Functions ========
 
 /// Withdraw platform fees (admin only)
@@ -733,11 +755,14 @@ public fun update_fee_rate(
 
 // ======== Entry Functions ========
 
-/// Entry function to create survey
-entry fun create_survey_entry(
+/// Enhanced entry function to create survey with questions
+entry fun create_survey_with_questions_entry(
     title: vector<u8>,
     description: vector<u8>,
     category: vector<u8>,
+    question_texts: vector<vector<u8>>,
+    question_types: vector<u8>,
+    question_options: vector<vector<vector<u8>>>,
     reward_per_response: u64,
     max_responses: u64,
     payment: Coin<SUI>,
@@ -745,11 +770,44 @@ entry fun create_survey_entry(
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
+    // Build questions
+    let mut questions = vector::empty<Question>();
+    let mut i = 0;
+    
+    while (i < vector::length(&question_texts)) {
+        let text = utf8(*vector::borrow(&question_texts, i));
+        let q_type = *vector::borrow(&question_types, i);
+        
+        // Convert options for this question
+        let options_raw = if (i < vector::length(&question_options)) {
+            vector::borrow(&question_options, i)
+        } else {
+            &vector::empty<vector<u8>>()
+        };
+        
+        let mut options = vector::empty<String>();
+        let mut j = 0;
+        while (j < vector::length(options_raw)) {
+            let option = utf8(*vector::borrow(options_raw, j));
+            vector::push_back(&mut options, option);
+            j = j + 1;
+        };
+        
+        let question = Question {
+            question_text: text,
+            question_type: q_type,
+            options,
+        };
+        
+        vector::push_back(&mut questions, question);
+        i = i + 1;
+    };
+    
     let cap = create_survey(
         utf8(title),
         utf8(description),
         utf8(category),
-        vector::empty(), // Questions will be added separately
+        questions,
         reward_per_response,
         max_responses,
         payment,
@@ -757,7 +815,48 @@ entry fun create_survey_entry(
         clock,
         ctx
     );
+    
     transfer::transfer(cap, ctx.sender());
+}
+
+
+/// Entry function to add questions
+entry fun add_questions_entry(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    question_texts: vector<vector<u8>>,
+    question_types: vector<u8>,
+    question_options: vector<vector<vector<u8>>>, // Nested vector for options
+    clock: &Clock,
+) {
+    let mut questions = vector::empty<Question>();
+    let mut i = 0;
+    
+    while (i < vector::length(&question_texts)) {
+        let text = utf8(*vector::borrow(&question_texts, i));
+        let q_type = *vector::borrow(&question_types, i);
+        
+        // Convert options
+        let options_raw = vector::borrow(&question_options, i);
+        let mut options = vector::empty<String>();
+        let mut j = 0;
+        while (j < vector::length(options_raw)) {
+            let option = utf8(*vector::borrow(options_raw, j));
+            vector::push_back(&mut options, option);
+            j = j + 1;
+        };
+        
+        let question = Question {
+            question_text: text,
+            question_type: q_type,
+            options,
+        };
+        
+        vector::push_back(&mut questions, question);
+        i = i + 1;
+    };
+    
+    add_questions(survey, cap, questions, clock);
 }
 
 /// Entry function to submit answer with blob ID

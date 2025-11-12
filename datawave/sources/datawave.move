@@ -558,8 +558,8 @@ public fun seal_approve_allowlist(
     let caller = ctx.sender();
     
     // Check if the id has the right prefix (survey_id)
-    // let namespace = survey_namespace(survey);
-    // assert!(is_prefix(namespace, id), EInvalidNamespace);  // Error 10
+    let namespace = survey_namespace(survey);
+    assert!(is_prefix(namespace, id), EInvalidNamespace);  // Error 10
     
     // Check if user is in allowlist
     assert!(vec_set::contains(&survey.allowlist, &caller), ECallerNotInAllowlist);  // Error 11

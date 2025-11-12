@@ -1,5 +1,5 @@
 // Survey Decryption Component with Seal
-// 完整修复版本 - 处理所有ID格式问题
+// 严格按照官方示例的版本
 
 import React, { useState, useEffect } from 'react';
 import { Button, Card, Flex, Text, Badge, Dialog, AlertDialog, Spinner } from '@radix-ui/themes';
@@ -76,46 +76,12 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     verifyKeyServers: false,
   });
 
-  // Helper function: 安全地将任意格式转换为hex字符串和字节数组
-  const convertToHexAndBytes = (idRaw: any): { hex: string; bytes: Uint8Array } => {
-    let idHex: string;
-    let idBytes: Uint8Array;
-    
-    if (typeof idRaw === 'string') {
-      // 如果已经是字符串，可能已经是hex
-      idHex = idRaw.startsWith('0x') ? idRaw.slice(2) : idRaw;
-      idBytes = fromHex(idHex);
-    } else if (idRaw instanceof Uint8Array) {
-      // 如果是Uint8Array
-      idBytes = idRaw;
-      idHex = Array.from(idBytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    } else if (Array.isArray(idRaw)) {
-      // 如果是普通数组
-      idBytes = new Uint8Array(idRaw);
-      idHex = Array.from(idBytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    } else if (idRaw && typeof idRaw === 'object' && 'length' in idRaw) {
-      // 如果是类数组对象
-      idBytes = new Uint8Array(Array.from(idRaw as any));
-      idHex = Array.from(idBytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    } else {
-      throw new Error(`无法处理的ID类型: ${typeof idRaw}`);
-    }
-    
-    return { hex: idHex, bytes: idBytes };
-  };
-
-  // Move call constructor
-  const constructMoveCall = (tx: Transaction, idHex: string) => {
+  // Move call constructor - 完全按照官方示例
+  const moveCallConstructor = (tx: Transaction, id: string) => {
     tx.moveCall({
       target: `${ConfigService.getPackageId()}::survey_system::seal_approve_allowlist`,
       arguments: [
-        tx.pure.vector('u8', fromHex(idHex)),
+        tx.pure.vector('u8', fromHex(id)),
         tx.object(surveyId),
       ],
     });
@@ -190,7 +156,6 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
             if (value) {
               let sealKeyIdStr = value.seal_key_id;
               
-              // 如果是字节数组，解码为字符串
               if (Array.isArray(sealKeyIdStr)) {
                 sealKeyIdStr = new TextDecoder().decode(new Uint8Array(sealKeyIdStr));
               }
@@ -274,9 +239,113 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     }
   };
   
-  // 下载并解密答案
- // 下载并解密答案 - 完全按照官方示例
-const decryptAnswer = async (blob: AnswerBlob) => {
+  // 批量下载并解密 - 完全按照官方示例的模式
+  const downloadAndDecrypt = async (blobIds: string[]) => {
+    if (!sessionKey) return;
+    
+    const aggregators = [
+      'aggregator1',
+      'aggregator2',
+      'aggregator3',
+      'aggregator4',
+      'aggregator5',
+      'aggregator6',
+    ];
+    
+    // First, download all files in parallel
+    const downloadResults = await Promise.all(
+      blobIds.map(async (blobId) => {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 10000);
+          const randomAggregator = aggregators[Math.floor(Math.random() * aggregators.length)];
+          const aggregatorUrl = `/${randomAggregator}/v1/blobs/${blobId}`;
+          const response = await fetch(aggregatorUrl, { signal: controller.signal });
+          clearTimeout(timeout);
+          if (!response.ok) {
+            return null;
+          }
+          return { blobId, data: await response.arrayBuffer() };
+        } catch (err) {
+          console.error(`Blob ${blobId} 无法下载`, err);
+          return null;
+        }
+      }),
+    );
+
+    // Filter out failed downloads
+    const validDownloads = downloadResults.filter((result): result is { blobId: string; data: ArrayBuffer } => result !== null);
+    
+    if (validDownloads.length === 0) {
+      throw new Error('无法下载任何文件');
+    }
+
+    // Fetch keys in batches of <=10 - 完全按照官方代码
+    for (let i = 0; i < validDownloads.length; i += 10) {
+      const batch = validDownloads.slice(i, i + 10);
+      const ids = batch.map((item) => EncryptedObject.parse(new Uint8Array(item.data)).id);
+      const tx = new Transaction();
+      ids.forEach((id) => moveCallConstructor(tx, id));
+      const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
+      
+      try {
+        await sealClient.fetchKeys({ ids, txBytes, sessionKey, threshold: 2 });
+      } catch (err) {
+        console.log(err);
+        const errorMsg = err instanceof NoAccessError
+          ? '没有访问权限'
+          : '无法解密文件，请重试';
+        throw new Error(errorMsg);
+      }
+    }
+
+    // Then, decrypt files sequentially - 完全按照官方代码
+    const decryptedData: DecryptedAnswer[] = [];
+    for (const { blobId, data } of validDownloads) {
+      const fullId = EncryptedObject.parse(new Uint8Array(data)).id;
+      const tx = new Transaction();
+      moveCallConstructor(tx, fullId);
+      const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
+      
+      try {
+        const decryptedFile = await sealClient.decrypt({
+          data: new Uint8Array(data),
+          sessionKey,
+          txBytes,
+        });
+        
+        const answerJson = new TextDecoder().decode(decryptedFile);
+        const answerData = JSON.parse(answerJson);
+        
+        const blob = answerBlobs.find(b => b.blobId === blobId);
+        if (blob) {
+          decryptedData.push({
+            surveyId: answerData.surveyId,
+            respondent: blob.respondent,
+            timestamp: answerData.timestamp || blob.submittedAt,
+            answers: answerData.answers,
+            consent: answerData.consent || blob.consentForSubscription
+          });
+          
+          decryptedAnswers.set(blobId, decryptedData[decryptedData.length - 1]);
+        }
+      } catch (err) {
+        console.log(err);
+        const errorMsg = err instanceof NoAccessError
+          ? '没有访问权限'
+          : '无法解密文件，请重试';
+        console.error(errorMsg, err);
+      }
+    }
+
+    if (decryptedData.length > 0) {
+      setDecryptedAnswers(new Map(decryptedAnswers));
+      alert(`成功解密 ${decryptedData.length} 个答案`);
+    }
+  };
+  
+  // 单个解密
+  const decryptAnswer = async (blob: AnswerBlob) => {
     if (!sessionKey || !currentAccount?.address) {
       setError('请先创建会话密钥');
       return;
@@ -291,75 +360,12 @@ const decryptAnswer = async (blob: AnswerBlob) => {
     setError(null);
     
     try {
-      // 1. 从Walrus下载加密数据
-      const aggregators = ['aggregator1', 'aggregator2', 'aggregator3', 'aggregator4', 'aggregator5', 'aggregator6'];
-      let encryptedData: ArrayBuffer | null = null;
-      
-      for (const aggregator of aggregators) {
-        try {
-          const response = await fetch(`/${aggregator}/v1/blobs/${blob.blobId}`);
-          if (response.ok) {
-            encryptedData = await response.arrayBuffer();
-            console.log(`从 ${aggregator} 下载成功`);
-            break;
-          }
-        } catch (err) {
-          console.error(`${aggregator} 下载失败`);
-        }
+      await downloadAndDecrypt([blob.blobId]);
+      const decrypted = decryptedAnswers.get(blob.blobId);
+      if (decrypted) {
+        setCurrentDecryptedAnswer(decrypted);
+        setShowDecryptedDialog(true);
       }
-      
-      if (!encryptedData) {
-        throw new Error('无法从Walrus下载数据');
-      }
-      
-      // 2. 解析加密对象 - 完全按照官方示例
-      const fullId = EncryptedObject.parse(new Uint8Array(encryptedData)).id;
-      console.log('加密对象ID:', fullId);
-      
-      // 3. 构建交易 - moveCallConstructor 期望接收 fullId (应该是 hex 字符串)
-      const tx = new Transaction();
-      tx.moveCall({
-        target: `${ConfigService.getPackageId()}::survey_system::seal_approve_allowlist`,
-        arguments: [
-          tx.pure.vector('u8', fromHex(fullId)), // fullId 是 hex 字符串，用 fromHex 转换为字节
-          tx.object(surveyId),
-        ],
-      });
-      const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
-      
-      // 4. 获取解密密钥
-      // 注意：官方示例中批量获取密钥时，ids 数组传的也是 fullId (hex字符串数组)
-      await sealClient.fetchKeys({
-        ids: [fullId], // 直接传入 fullId
-        txBytes,
-        sessionKey,
-        threshold: 2
-      });
-      
-      // 5. 解密数据
-      const decryptedData = await sealClient.decrypt({
-        data: new Uint8Array(encryptedData),
-        sessionKey,
-        txBytes,
-      });
-      
-      // 6. 解析结果
-      const answerJson = new TextDecoder().decode(decryptedData);
-      const answerData = JSON.parse(answerJson);
-      
-      const decrypted: DecryptedAnswer = {
-        surveyId: answerData.surveyId,
-        respondent: blob.respondent,
-        timestamp: answerData.timestamp || blob.submittedAt,
-        answers: answerData.answers,
-        consent: answerData.consent || blob.consentForSubscription
-      };
-      
-      decryptedAnswers.set(blob.blobId, decrypted);
-      setDecryptedAnswers(new Map(decryptedAnswers));
-      setCurrentDecryptedAnswer(decrypted);
-      setShowDecryptedDialog(true);
-      
     } catch (error: any) {
       console.error('解密错误:', error);
       setError(error.message || '解密失败');
@@ -384,90 +390,8 @@ const decryptAnswer = async (blob: AnswerBlob) => {
     setDecryptingBlobId('all');
     
     try {
-      const aggregators = [
-        'aggregator1',
-        'aggregator2',
-        'aggregator3',
-        'aggregator4',
-        'aggregator5',
-        'aggregator6',
-      ];
-      
-      // 下载所有加密数据
-      const downloadResults = await Promise.all(
-        answerBlobs.map(async (blob) => {
-          for (const aggregator of aggregators) {
-            try {
-              const response = await fetch(`/${aggregator}/v1/blobs/${blob.blobId}`);
-              if (response.ok) {
-                const data = await response.arrayBuffer();
-                return { blob, data };
-              }
-            } catch (err) {
-              console.error(`下载 ${blob.blobId} 失败:`, err);
-            }
-          }
-          return null;
-        })
-      );
-
-      const validDownloads = downloadResults.filter((r): r is { blob: AnswerBlob; data: ArrayBuffer } => r !== null);
-      
-      if (validDownloads.length === 0) {
-        throw new Error('无法下载任何答案数据');
-      }
-
-      // 批量获取密钥（最多10个一批）
-      for (let i = 0; i < validDownloads.length; i += 10) {
-        const batch = validDownloads.slice(i, i + 10);
-        const idsAndHexes = batch.map((item) => {
-          const encObj = EncryptedObject.parse(new Uint8Array(item.data));
-          const idRaw = encObj.id;
-          return convertToHexAndBytes(idRaw);
-        });
-        
-        const tx = new Transaction();
-        idsAndHexes.forEach(({ hex }) => {
-          constructMoveCall(tx, hex);
-        });
-        const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
-        
-        const ids = idsAndHexes.map(({ bytes }) => bytes);
-        await sealClient.fetchKeys({ ids, txBytes, sessionKey, threshold: 2 });
-      }
-
-      // 逐个解密
-      for (const { blob, data } of validDownloads) {
-        const encryptedObject = EncryptedObject.parse(new Uint8Array(data));
-        const { hex: idHex } = convertToHexAndBytes(encryptedObject.id);
-        
-        const tx = new Transaction();
-        constructMoveCall(tx, idHex);
-        const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
-        
-        const decryptedData = await sealClient.decrypt({
-          data: new Uint8Array(data),
-          sessionKey,
-          txBytes,
-        });
-        
-        const answerJson = new TextDecoder().decode(decryptedData);
-        const answerData = JSON.parse(answerJson);
-        
-        const decrypted: DecryptedAnswer = {
-          surveyId: answerData.surveyId,
-          respondent: blob.respondent,
-          timestamp: answerData.timestamp || blob.submittedAt,
-          answers: answerData.answers,
-          consent: answerData.consent || blob.consentForSubscription
-        };
-        
-        decryptedAnswers.set(blob.blobId, decrypted);
-      }
-      
-      setDecryptedAnswers(new Map(decryptedAnswers));
-      alert(`成功解密 ${validDownloads.length} 个答案`);
-      
+      const blobIds = answerBlobs.map(b => b.blobId);
+      await downloadAndDecrypt(blobIds);
     } catch (error: any) {
       console.error('批量解密错误:', error);
       setError(error.message || '批量解密失败');
@@ -510,7 +434,7 @@ const decryptAnswer = async (blob: AnswerBlob) => {
     return new Date(timestamp).toLocaleString('zh-CN');
   };
   
-  // Format answer based on type
+  // Format answer
   const formatAnswer = (answer: any, questionType: number) => {
     if (questionType === 0) {
       return answer;

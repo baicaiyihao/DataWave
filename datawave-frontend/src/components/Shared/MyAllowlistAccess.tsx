@@ -1,9 +1,10 @@
-// My Allowlist Access Page
+// My Allowlist Access Page - Router Version
 // 查看我被加入白名单的问卷
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Grid, Tabs } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
 import { 
   Shield,
@@ -42,6 +43,7 @@ interface AllowlistSurvey {
 }
 
 export function MyAllowlistAccess() {
+  const navigate = useNavigate();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   const packageId = ConfigService.getPackageId();
@@ -65,6 +67,16 @@ export function MyAllowlistAccess() {
     withAnswers: 0,
     totalAnswers: 0,
   });
+
+  // Navigation functions
+  const viewSurveyDetails = (surveyId: string) => {
+    navigate(`/survey/${surveyId}`);
+  };
+
+  const startDecryption = (surveyId: string) => {
+    // Navigate to the allowlist decrypt page
+    navigate(`/allowlist/decrypt/${surveyId}`);
+  };
 
   // 加载用户在 allowlist 中的问卷
   const loadAllowlistSurveys = async () => {
@@ -254,23 +266,6 @@ export function MyAllowlistAccess() {
   const formatDate = (timestamp: string) => {
     const date = new Date(parseInt(timestamp));
     return date.toLocaleDateString();
-  };
-
-  // 查看问卷详情
-  const viewSurveyDetails = (surveyId: string) => {
-    const event = new CustomEvent('viewSurveyDetails', { 
-      detail: { surveyId } 
-    });
-    window.dispatchEvent(event);
-  };
-
-  // 开始解密答案
-  const startDecryption = (surveyId: string) => {
-    // 直接触发管理访问事件，传递surveyId
-    const event = new CustomEvent('manageSurveyAllowlist', { 
-      detail: { surveyId } 
-    });
-    window.dispatchEvent(event);
   };
 
   if (!currentAccount) {
@@ -582,3 +577,5 @@ export function MyAllowlistAccess() {
     </Flex>
   );
 }
+
+export default MyAllowlistAccess;

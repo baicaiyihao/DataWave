@@ -1,9 +1,10 @@
-// Survey Decryption Component with Seal
+// Survey Decryption Component with Seal - Router Version
 // 严格按照官方示例的版本
 
 import React, { useState, useEffect } from 'react';
 import { Button, Card, Flex, Text, Badge, Dialog, AlertDialog, Spinner } from '@radix-ui/themes';
 import { useSignPersonalMessage, useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useParams } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
 import { fromHex } from '@mysten/sui/utils';
 import { SealClient, SessionKey, EncryptedObject, NoAccessError } from '@mysten/seal';
@@ -34,12 +35,18 @@ interface DecryptedAnswer {
   consent: boolean;
 }
 
+// 如果需要单独使用这个组件（从路由直接访问）
 interface SurveyDecryptionProps {
-  surveyId: string;
+  surveyId?: string;  // 可选，因为可能从路由参数获取
   isCreator?: boolean;
 }
 
-export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecryptionProps) {
+export function SurveyDecryption(props: SurveyDecryptionProps) {
+  // 优先使用路由参数，如果没有则使用props
+  const routeParams = useParams<{ surveyId: string }>();
+  const surveyId = props.surveyId || routeParams.surveyId;
+  const isCreator = props.isCreator || false;
+
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
   const { mutate: signPersonalMessage } = useSignPersonalMessage();
@@ -78,6 +85,8 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
 
   // Move call constructor - 完全按照官方示例
   const moveCallConstructor = (tx: Transaction, id: string) => {
+    if (!surveyId) return;
+    
     tx.moveCall({
       target: `${ConfigService.getPackageId()}::survey_system::seal_approve_allowlist`,
       arguments: [
@@ -87,7 +96,7 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     });
   };
   
-  // Load survey data
+  // Load survey data - 保持完整功能
   const loadSurveyData = async () => {
     if (!surveyId || !currentAccount?.address) return;
     
@@ -133,7 +142,7 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     }
   };
   
-  // Load answer blobs
+  // Load answer blobs - 保持完整功能
   const loadAnswerBlobs = async (surveyFields: any) => {
     const blobs: AnswerBlob[] = [];
     
@@ -179,7 +188,7 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     console.log(`成功加载 ${blobs.length} 个答案blobs`);
   };
   
-  // Create or load session key
+  // Create or load session key - 保持完整功能
   const handleSessionKey = async () => {
     if (!currentAccount?.address || !signPersonalMessage) {
       setError('请先连接钱包');
@@ -239,9 +248,9 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     }
   };
   
-  // 批量下载并解密 - 完全按照官方示例的模式
+  // 批量下载并解密 - 保持完整的官方示例实现
   const downloadAndDecrypt = async (blobIds: string[]) => {
-    if (!sessionKey) return;
+    if (!sessionKey || !surveyId) return;
     
     const aggregators = [
       'aggregator1',
@@ -344,7 +353,7 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     }
   };
   
-  // 单个解密
+  // 单个解密 - 保持完整功能
   const decryptAnswer = async (blob: AnswerBlob) => {
     if (!sessionKey || !currentAccount?.address) {
       setError('请先创建会话密钥');
@@ -374,7 +383,7 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     }
   };
 
-  // 批量解密所有答案
+  // 批量解密所有答案 - 保持完整功能
   const decryptAllAnswers = async () => {
     if (!sessionKey || !currentAccount?.address) {
       setError('请先创建会话密钥');
@@ -447,6 +456,14 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
   
   const isInAllowlist = currentAccount?.address && allowlist.includes(currentAccount.address);
   
+  if (!surveyId) {
+    return (
+      <Card>
+        <Text>No survey ID provided</Text>
+      </Card>
+    );
+  }
+  
   if (loading) {
     return (
       <Card>
@@ -458,9 +475,10 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
     );
   }
   
+  // 以下是完整的UI渲染部分，保持所有原有功能
   return (
     <Flex direction="column" gap="3">
-      {/* Status Card */}
+      {/* Status Card - 保持完整 */}
       <Card>
         <Flex direction="column" gap="3">
           <Flex justify="between" align="center">
@@ -544,7 +562,7 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
         </Flex>
       </Card>
       
-      {/* Answers List */}
+      {/* Answers List - 保持完整 */}
       <Card>
         <Flex direction="column" gap="3">
           <Text size="3" weight="bold">提交的答案</Text>
@@ -623,7 +641,7 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
         </Flex>
       </Card>
       
-      {/* Error Dialog */}
+      {/* Error Dialog - 保持完整 */}
       <AlertDialog.Root open={!!error}>
         <AlertDialog.Content>
           <AlertDialog.Title>错误</AlertDialog.Title>
@@ -634,7 +652,7 @@ export function SurveyDecryption({ surveyId, isCreator = false }: SurveyDecrypti
         </AlertDialog.Content>
       </AlertDialog.Root>
       
-      {/* Decrypted Answer Dialog */}
+      {/* Decrypted Answer Dialog - 保持完整 */}
       <Dialog.Root open={showDecryptedDialog} onOpenChange={setShowDecryptedDialog}>
         <Dialog.Content style={{ maxWidth: '600px' }}>
           <Dialog.Title>解密的答案</Dialog.Title>

@@ -1,9 +1,10 @@
-// View All Surveys Component with Pagination
+// View All Surveys Component with Pagination - Router Version
 // 自动查询所有问卷并分页展示
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Grid, Select, TextField } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
 import { ChevronLeft, ChevronRight, RefreshCw, Search, Filter } from 'lucide-react';
 
@@ -20,18 +21,15 @@ interface SurveyBasicInfo {
   creator?: string;
 }
 
-interface ViewAllSurveysProps {
-  onViewDetails?: (surveyId: string) => void;
-}
-
-export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
+// 移除了 props 接口
+export function ViewAllSurveys() {
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
+  const navigate = useNavigate(); // 添加路由导航
   
   const [surveys, setSurveys] = useState<SurveyBasicInfo[]>([]);
   const [filteredSurveys, setFilteredSurveys] = useState<SurveyBasicInfo[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedSurvey, setSelectedSurvey] = useState<string>('');
   
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,6 +47,16 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
     activeSurveys: 0,
     totalResponses: 0,
   });
+
+  // 查看详情 - 改用路由导航
+  const viewDetails = (surveyId: string) => {
+    navigate(`/survey/${surveyId}`);
+  };
+
+  // 回答问卷 - 新增方法
+  const answerSurvey = (surveyId: string) => {
+    navigate(`/earn/answer/${surveyId}`);
+  };
 
   // 获取所有问卷
   const fetchAllSurveys = async () => {
@@ -232,15 +240,6 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
     return (parseInt(amount) / 1000000000).toFixed(3);
   };
 
-  // 查看详情
-  const viewDetails = (surveyId: string) => {
-    setSelectedSurvey(surveyId);
-    // 使用回调或者设置状态来显示详情
-    if (onViewDetails) {
-      onViewDetails(surveyId);
-    }
-  };
-
   return (
     <Flex direction="column" gap="3">
       {/* Header with Stats */}
@@ -338,9 +337,8 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
           {currentSurveys.map(survey => (
             <Card 
               key={survey.id} 
-              style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+              style={{ transition: 'all 0.2s' }}
               className="hover:shadow-lg"
-              onClick={() => viewDetails(survey.id)}
             >
               <Flex direction="column" gap="2" height="100%">
                 <Flex justify="between" align="start">
@@ -389,9 +387,46 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
                   )}
                 </Flex>
                 
-                <Button size="2" variant="soft" style={{ marginTop: '8px' }}>
-                  View Details →
-                </Button>
+                {/* 修改按钮部分 */}
+                <Flex gap="2" mt="2">
+                  {survey.isActive && survey.currentResponses < survey.maxResponses ? (
+                    <>
+                      <Button 
+                        size="2" 
+                        style={{ flex: 1 }}
+                        onClick={(e) => {
+                          e.stopPropagation(); // 防止事件冒泡
+                          answerSurvey(survey.id);
+                        }}
+                      >
+                        Answer
+                      </Button>
+                      <Button 
+                        size="2" 
+                        variant="soft"
+                        style={{ flex: 1 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          viewDetails(survey.id);
+                        }}
+                      >
+                        Details
+                      </Button>
+                    </>
+                  ) : (
+                    <Button 
+                      size="2" 
+                      variant="soft" 
+                      style={{ width: '100%' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        viewDetails(survey.id);
+                      }}
+                    >
+                      View Details →
+                    </Button>
+                  )}
+                </Flex>
               </Flex>
             </Card>
           ))}
@@ -457,3 +492,5 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
     </Flex>
   );
 }
+
+export default ViewAllSurveys;

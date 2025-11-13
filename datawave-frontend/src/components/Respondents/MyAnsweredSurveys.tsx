@@ -1,9 +1,10 @@
-// My Answered Surveys Page
+// My Answered Surveys Page - Router Version
 // 查看我回答过的问卷
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Grid, Tabs, Dialog } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
 import { 
   CheckCircle,
@@ -50,6 +51,7 @@ interface AnswerDetail {
 export function MyAnsweredSurveys() {
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
+  const navigate = useNavigate();
   const packageId = ConfigService.getPackageId();
   
   const [answeredSurveys, setAnsweredSurveys] = useState<AnsweredSurvey[]>([]);
@@ -179,9 +181,6 @@ export function MyAnsweredSurveys() {
         }
       }
       
-      // 也可以从 Registry 中查找用户作为 respondent 的记录
-      // （这部分可以根据合约具体实现来补充）
-      
       // 按回答时间排序（最近的在前）
       answered.sort((a, b) => b.answeredAt - a.answeredAt);
       
@@ -231,6 +230,16 @@ export function MyAnsweredSurveys() {
     }
     
     setShowDetailDialog(true);
+  };
+
+  // 查看原始问卷 - 改用路由导航
+  const viewOriginalSurvey = (surveyId: string) => {
+    navigate(`/survey/${surveyId}`);
+  };
+
+  // 去回答更多问卷
+  const browseMoreSurveys = () => {
+    navigate('/earn/browse');
   };
 
   // 应用筛选
@@ -283,14 +292,6 @@ export function MyAnsweredSurveys() {
 
   const formatSUI = (amount: string) => {
     return (parseInt(amount) / 1000000000).toFixed(4);
-  };
-
-  // 查看原始问卷
-  const viewOriginalSurvey = (surveyId: string) => {
-    const event = new CustomEvent('viewSurveyDetails', { 
-      detail: { surveyId } 
-    });
-    window.dispatchEvent(event);
   };
 
   if (!currentAccount) {
@@ -448,6 +449,11 @@ export function MyAnsweredSurveys() {
             <Text size="2" color="gray">
               {answeredSurveys.length === 0 && "Start answering surveys to earn rewards"}
             </Text>
+            {answeredSurveys.length === 0 && (
+              <Button onClick={browseMoreSurveys} variant="soft">
+                Browse Surveys
+              </Button>
+            )}
           </Flex>
         </Card>
       ) : (
@@ -651,3 +657,5 @@ export function MyAnsweredSurveys() {
     </Flex>
   );
 }
+
+export default MyAnsweredSurveys;

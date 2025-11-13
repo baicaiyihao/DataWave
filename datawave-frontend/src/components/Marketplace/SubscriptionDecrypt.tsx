@@ -1,9 +1,10 @@
-// Subscription Decrypt Page with Seal Integration
+// Subscription Decrypt Page with Seal Integration - Router Version
 // 订阅后查看解密的问卷答案 - 完整实现
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Dialog, AlertDialog, Spinner } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount, useSignPersonalMessage } from '@mysten/dapp-kit';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
 import { fromHex } from '@mysten/sui/utils';
 import { SealClient, SessionKey, EncryptedObject, NoAccessError } from '@mysten/seal';
@@ -20,7 +21,8 @@ import {
   Calendar,
   Clock,
   Key,
-  Eye
+  Eye,
+  ArrowLeft
 } from 'lucide-react';
 import { set, get } from 'idb-keyval';
 
@@ -67,16 +69,17 @@ interface SubscriptionInfo {
   createdAt: number;
 }
 
-interface SubscriptionDecryptProps {
-  surveyId: string;
-  subscriptionId?: string;
-}
-
-export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDecryptProps) {
+export function SubscriptionDecrypt() {
+  const { surveyId } = useParams<{ surveyId: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   const { mutate: signPersonalMessage } = useSignPersonalMessage();
   const packageId = ConfigService.getPackageId();
+  
+  // Get subscriptionId from route state if provided
+  const subscriptionId = location.state?.subscriptionId;
   
   // Survey and subscription data
   const [surveyInfo, setSurveyInfo] = useState<SurveyInfo | null>(null);
@@ -94,6 +97,15 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
   const [decryptedAnswers, setDecryptedAnswers] = useState<Map<string, DecryptedAnswer>>(new Map());
   const [showDecryptedDialog, setShowDecryptedDialog] = useState(false);
   const [currentDecryptedAnswer, setCurrentDecryptedAnswer] = useState<DecryptedAnswer | null>(null);
+
+  // Navigation functions
+  const goBack = () => {
+    navigate('/my-subscriptions');
+  };
+
+  const browseSubscriptions = () => {
+    navigate('/marketplace/subscriptions');
+  };
   
   // Seal client configuration
   const serverObjectIds = [
@@ -112,20 +124,20 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
 
   // Move call constructor for subscription access
   const moveCallConstructor = (tx: Transaction, id: string) => {
-    if (!subscriptionInfo) {
+    if (!subscriptionInfo || !surveyId) {
       throw new Error('No subscription info available');
     }
     
     // 使用 seal_approve_subscription 进行订阅验证
     tx.moveCall({
-    target: `${packageId}::survey_system::seal_approve_subscription`,
-    arguments: [
+      target: `${packageId}::survey_system::seal_approve_subscription`,
+      arguments: [
         tx.pure.vector('u8', fromHex(id)), // 加密文件ID
         tx.object(subscriptionInfo.id), // Subscription NFT (用户的订阅)
         tx.object(subscriptionInfo.serviceId), // SubscriptionService (问卷的订阅服务)
         tx.object(surveyId), // Survey object
         tx.object('0x6'), // Clock
-    ],
+      ],
     });
   };
 
@@ -335,7 +347,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     }
   };
 
-  // Download and decrypt blobs
+  // Download and decrypt blobs (保持完整功能)
   const downloadAndDecrypt = async (blobIds: string[]) => {
     if (!sessionKey || !subscriptionInfo) return;
     
@@ -443,6 +455,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     }
   };
 
+  // 其他所有函数保持不变...
   // Decrypt single answer
   const decryptSingleAnswer = async (blob: AnswerBlob) => {
     if (!sessionKey || !subscriptionInfo) {
@@ -545,7 +558,9 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
 
   // Load data on mount
   useEffect(() => {
-    loadData();
+    if (surveyId) {
+      loadData();
+    }
   }, [surveyId, subscriptionId, currentAccount?.address]);
 
   // Auto load session key
@@ -594,6 +609,14 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     return answer;
   };
 
+  if (!surveyId) {
+    return (
+      <Card>
+        <Text>No survey ID provided</Text>
+      </Card>
+    );
+  }
+
   if (loading) {
     return (
       <Card>
@@ -620,12 +643,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
           <Lock size={48} />
           <Text size="4" weight="bold">Subscription Required</Text>
           <Text size="2" color="gray">You need an active subscription to view survey answers</Text>
-          <Button onClick={() => {
-            const event = new CustomEvent('navigateTo', { 
-              detail: { tab: 'browse-subscriptions' } 
-            });
-            window.dispatchEvent(event);
-          }}>
+          <Button onClick={browseSubscriptions}>
             Browse Subscriptions
           </Button>
         </Flex>
@@ -633,13 +651,18 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     );
   }
 
+  // 完整的UI渲染（保持原有所有功能）
   return (
     <Flex direction="column" gap="3">
-      {/* Header */}
+      {/* Header with Back Button */}
       <Card>
         <Flex direction="column" gap="3">
           <Flex justify="between" align="start">
             <div>
+              <Button variant="ghost" onClick={goBack} mb="2">
+                <ArrowLeft size={16} />
+                Back to My Subscriptions
+              </Button>
               <Text size="5" weight="bold">{surveyInfo.title}</Text>
               <Text size="2" color="gray">{surveyInfo.description}</Text>
               <Flex gap="2" mt="2">
@@ -671,6 +694,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
         </Flex>
       </Card>
 
+      {/* 其余UI组件保持不变... */}
       {/* Session Key & Actions */}
       <Card>
         <Flex direction="column" gap="3">
@@ -748,7 +772,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
         </Flex>
       </Card>
 
-      {/* Answers List */}
+      {/* Answers List - 完整保留 */}
       <Card>
         <Flex direction="column" gap="3">
           <Text size="3" weight="bold">Survey Answers (Consented Only)</Text>
@@ -825,7 +849,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
         </Flex>
       </Card>
 
-      {/* Error Dialog */}
+      {/* Error Dialog - 保持不变 */}
       <AlertDialog.Root open={!!error}>
         <AlertDialog.Content>
           <AlertDialog.Title>Error</AlertDialog.Title>
@@ -836,7 +860,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
         </AlertDialog.Content>
       </AlertDialog.Root>
 
-      {/* Decrypted Answer Dialog */}
+      {/* Decrypted Answer Dialog - 完整保留 */}
       <Dialog.Root open={showDecryptedDialog} onOpenChange={setShowDecryptedDialog}>
         <Dialog.Content style={{ maxWidth: '600px' }}>
           <Dialog.Title>Decrypted Answer</Dialog.Title>
@@ -898,3 +922,5 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     </Flex>
   );
 }
+
+export default SubscriptionDecrypt;

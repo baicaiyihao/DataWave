@@ -1,9 +1,10 @@
-// Create Survey Component - Optimized Version
+// Create Survey Component - Router Version
 // 使用 create_survey_with_questions_entry 创建问卷
 
 import React, { useState, useEffect } from 'react';
 import { Button, Card, Flex, TextField, Text, TextArea, Badge } from '@radix-ui/themes';
 import { useSignAndExecuteTransaction, useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { Transaction } from "@mysten/sui/transactions";
 import { ConfigService } from '../../services/config';
 import { Trash2, Plus, Coins } from 'lucide-react';
@@ -22,9 +23,10 @@ interface Question {
   options: string[];
 }
 
-export function MerchantCreateSurveyOptimized() {
+export function MerchantCreateSurvey() {
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
+  const navigate = useNavigate();
   const packageId = ConfigService.getPackageId();
   
   // 基本信息状态
@@ -276,11 +278,11 @@ export function MerchantCreateSurveyOptimized() {
             setMaxResponses('100');
             
             if (viewDetails) {
-              // 发送事件通知 App.tsx
-              const event = new CustomEvent('viewSurveyDetails', { 
-                detail: { surveyId } 
-              });
-              window.dispatchEvent(event);
+              // 使用路由导航到问卷详情
+              navigate(`/survey/${surveyId}`);
+            } else {
+              // 导航到我的问卷列表
+              navigate('/enterprise/surveys');
             }
             
           } else {
@@ -290,18 +292,17 @@ export function MerchantCreateSurveyOptimized() {
               `View on explorer:\n` +
               `https://suiscan.xyz/testnet/tx/${result.digest}`
             );
+            
+            // 导航到我的问卷列表
+            navigate('/enterprise/surveys');
           }
           
         } catch (error) {
           console.error('Error fetching transaction details:', error);
           alert(`✅ Survey created!\nTransaction: ${result.digest}`);
+          // 导航到我的问卷列表
+          navigate('/enterprise/surveys');
         }
-        
-        // 重置表单
-        setTitle('');
-        setDescription('');
-        setCategory('');
-        setQuestions([]);
         
       } else {
         alert('Transaction failed. Please try again.');
@@ -521,16 +522,27 @@ export function MerchantCreateSurveyOptimized() {
         </Flex>
       </Card>
       
-      {/* Create Button */}
+      {/* Action Buttons */}
       <Card>
-        <Button
-          size="3"
-          onClick={handleCreateSurvey}
-          disabled={isCreating || questions.length === 0 || !currentAccount || !isBalanceSufficient}
-          style={{ width: '100%' }}
-        >
-          {isCreating ? 'Creating Survey...' : `Create Survey (Cost: ${totalCost.toFixed(3)} SUI)`}
-        </Button>
+        <Flex direction="column" gap="2">
+          <Button
+            size="3"
+            onClick={handleCreateSurvey}
+            disabled={isCreating || questions.length === 0 || !currentAccount || !isBalanceSufficient}
+            style={{ width: '100%' }}
+          >
+            {isCreating ? 'Creating Survey...' : `Create Survey (Cost: ${totalCost.toFixed(3)} SUI)`}
+          </Button>
+          
+          <Button
+            size="2"
+            variant="soft"
+            onClick={() => navigate('/enterprise/surveys')}
+            style={{ width: '100%' }}
+          >
+            Cancel
+          </Button>
+        </Flex>
         
         {!currentAccount && (
           <Text size="2" color="red" align="center" style={{ marginTop: '8px' }}>
@@ -547,3 +559,5 @@ export function MerchantCreateSurveyOptimized() {
     </Flex>
   );
 }
+
+export default MerchantCreateSurvey;

@@ -1,10 +1,11 @@
-// Survey Management Page - 问卷综合管理页面
-// 改进版本：使用 Survey 中的 subscription_service_id
+// Survey Management Page - Router Version
+// 问卷综合管理页面 - 完整功能版本
 // 集成订阅服务和订阅者列表显示
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Tabs, Dialog, TextField, ScrollArea } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
 import { ConfigService } from '../../services/config';
 import { 
@@ -29,7 +30,8 @@ import {
   TrendingUp,
   User,
   Calendar,
-  CreditCard
+  CreditCard,
+  ArrowLeft
 } from 'lucide-react';
 
 // Import the decryption component
@@ -73,12 +75,9 @@ interface SubscriberInfo {
   isExpired: boolean;
 }
 
-// Props interface
-interface SurveyManagementPageProps {
-  surveyId: string;
-}
-
-export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
+export function SurveyManagementPage() {
+  const { surveyId } = useParams<{ surveyId: string }>();
+  const navigate = useNavigate();
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
   const packageId = ConfigService.getPackageId();
@@ -115,8 +114,17 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
         },
       }),
   });
+
+  // Navigation functions
+  const viewSurveyDetails = () => {
+    navigate(`/survey/${surveyId}`);
+  };
+
+  const backToMySurveys = () => {
+    navigate('/enterprise/surveys');
+  };
   
-  // Load survey details
+  // Load survey details - 完整保留所有功能
   const loadSurveyDetails = async () => {
     if (!surveyId || !currentAccount?.address) return;
     
@@ -325,7 +333,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
     }
   };
   
-  // Create subscription service
+  // Create subscription service - 完整功能
   const createSubscriptionService = () => {
     if (!survey?.capId || !subscriptionPrice || !subscriptionDuration) {
       if (!survey?.capId) {
@@ -378,7 +386,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
     );
   };
   
-  // Add address to allowlist
+  // Add address to allowlist - 完整功能
   const addToAllowlist = () => {
     if (!survey?.capId || !newAllowlistAddress) {
       if (!survey?.capId) {
@@ -431,7 +439,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
     );
   };
   
-  // Remove address from allowlist
+  // Remove address from allowlist - 完整功能
   const removeFromAllowlist = (address: string) => {
     if (!survey?.capId) {
       alert('SurveyCap not found. Cannot modify allowlist without management capability.');
@@ -477,7 +485,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
     loadSurveyDetails();
   }, [surveyId, currentAccount?.address]);
   
-  // Helper functions
+  // Helper functions - 完整保留
   const formatSUI = (amount: string | number) => {
     const value = typeof amount === 'string' ? parseInt(amount) : amount;
     return (value / 1000000000).toFixed(4);
@@ -501,10 +509,12 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
   
   const shareSubscriptionLink = () => {
     if (!survey?.subscriptionService) return;
-    const link = `${window.location.origin}/subscription/${survey.subscriptionService.serviceId}`;
+    const link = `${window.location.origin}/#/marketplace/subscription/${survey.subscriptionService.serviceId}`;
     copyToClipboard(link);
   };
   
+  // 以下是完整的UI渲染部分
+
   if (loading) {
     return (
       <Card>
@@ -521,6 +531,10 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
         <Flex direction="column" align="center" gap="3" py="5">
           <AlertCircle size={48} color="red" />
           <Text size="4" color="red">{error}</Text>
+          <Button onClick={backToMySurveys} variant="soft">
+            <ArrowLeft size={16} />
+            Back to My Surveys
+          </Button>
         </Flex>
       </Card>
     );
@@ -529,14 +543,20 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
   if (!survey) {
     return (
       <Card>
-        <Text>Survey not found</Text>
+        <Flex direction="column" align="center" gap="3" py="5">
+          <Text>Survey not found</Text>
+          <Button onClick={backToMySurveys} variant="soft">
+            <ArrowLeft size={16} />
+            Back to My Surveys
+          </Button>
+        </Flex>
       </Card>
     );
   }
   
   return (
     <Flex direction="column" gap="3">
-      {/* Header */}
+      {/* Header - 完整保留 */}
       <Card>
         <Flex direction="column" gap="3">
           <Flex justify="between" align="center">
@@ -559,6 +579,13 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
             <Flex gap="2">
               <Button
                 variant="soft"
+                onClick={backToMySurveys}
+              >
+                <ArrowLeft size={16} />
+                Back
+              </Button>
+              <Button
+                variant="soft"
                 onClick={() => {
                   setRefreshing(true);
                   loadSurveyDetails().finally(() => setRefreshing(false));
@@ -570,10 +597,17 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
               </Button>
               <Button
                 variant="soft"
+                onClick={viewSurveyDetails}
+              >
+                <Eye size={16} />
+                View Details
+              </Button>
+              <Button
+                variant="soft"
                 onClick={() => window.open(`https://suiscan.xyz/testnet/object/${survey.id}`, '_blank')}
               >
                 <ExternalLink size={16} />
-                View on Explorer
+                Explorer
               </Button>
             </Flex>
           </Flex>
@@ -591,7 +625,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
             </Card>
           )}
           
-          {/* Stats */}
+          {/* Stats - 完整保留所有统计卡片 */}
           <Flex gap="3" wrap="wrap">
             <Card style={{ backgroundColor: 'var(--blue-1)' }}>
               <Flex direction="column" gap="1">
@@ -646,7 +680,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
         </Flex>
       </Card>
       
-      {/* Tabs */}
+      {/* Tabs - 完整保留所有标签页内容 */}
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
         <Tabs.List>
           <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
@@ -666,8 +700,8 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
           </Tabs.Trigger>
         </Tabs.List>
         
+        {/* Overview Tab - 完整内容 */}
         <Tabs.Content value="overview">
-          {/* Overview content remains the same */}
           <Card>
             <Flex direction="column" gap="3">
               <Text size="3" weight="bold">Survey Information</Text>
@@ -774,6 +808,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
           </Card>
         </Tabs.Content>
         
+        {/* Subscription Tab - 完整内容（续） */}
         <Tabs.Content value="subscription">
           <Card>
             <Flex direction="column" gap="3">
@@ -912,7 +947,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
                       <Text size="2">Share this link with potential subscribers:</Text>
                       <Card>
                         <Text size="1" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                          {window.location.origin}/subscription/{survey.subscriptionService.serviceId}
+                          {window.location.origin}/#/marketplace/subscription/{survey.subscriptionService.serviceId}
                         </Text>
                       </Card>
                       <Button size="2" onClick={shareSubscriptionLink}>
@@ -948,6 +983,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
           </Card>
         </Tabs.Content>
         
+        {/* Allowlist Tab - 完整内容 */}
         <Tabs.Content value="allowlist">
           <Card>
             <Flex direction="column" gap="3">
@@ -1077,12 +1113,13 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
           </Card>
         </Tabs.Content>
         
+        {/* Decrypt Tab */}
         <Tabs.Content value="decrypt">
           <SurveyDecryption surveyId={survey.id} isCreator={true} />
         </Tabs.Content>
       </Tabs.Root>
       
-      {/* Dialogs */}
+      {/* 所有对话框 - 完整保留 */}
       
       {/* Subscribers List Dialog */}
       <Dialog.Root open={showSubscribers} onOpenChange={setShowSubscribers}>
@@ -1092,7 +1129,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
             List of all users who have subscribed to access survey data
           </Dialog.Description>
           
-          {survey.subscriptionService && survey.subscriptionService.subscribers.length > 0 ? (
+          {survey?.subscriptionService && survey.subscriptionService.subscribers.length > 0 ? (
             <ScrollArea style={{ height: '400px' }}>
               <Flex direction="column" gap="2">
                 {survey.subscriptionService.subscribers.map((subscriber, idx) => (
@@ -1198,7 +1235,7 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
         </Dialog.Content>
       </Dialog.Root>
       
-      {/* Add to Allowlist Dialog remains the same */}
+      {/* Add to Allowlist Dialog */}
       <Dialog.Root open={showAddToAllowlist} onOpenChange={setShowAddToAllowlist}>
         <Dialog.Content style={{ maxWidth: 450 }}>
           <Dialog.Title>Add to Allowlist</Dialog.Title>
@@ -1238,3 +1275,5 @@ export function SurveyManagementPage({ surveyId }: SurveyManagementPageProps) {
     </Flex>
   );
 }
+
+export default SurveyManagementPage;

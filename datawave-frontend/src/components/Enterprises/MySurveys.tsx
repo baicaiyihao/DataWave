@@ -1,9 +1,10 @@
-// My Surveys Management Component with Subscription Services
+// My Surveys Management Component with Subscription Services - Router Version
 // 改进版本：使用更可靠的获取问卷方式
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Tabs } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
 import { 
   FileText, 
@@ -19,7 +20,8 @@ import {
   DollarSign,
   Gift,
   TrendingUp,
-  Clock
+  Clock,
+  Plus
 } from 'lucide-react';
 
 interface SurveyData {
@@ -49,6 +51,7 @@ interface SurveyData {
 export function MySurveys() {
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
+  const navigate = useNavigate();
   const packageId = ConfigService.getPackageId();
   
   const [mySurveys, setMySurveys] = useState<SurveyData[]>([]);
@@ -65,6 +68,28 @@ export function MySurveys() {
     totalSubscriptionRevenue: 0,
     totalSubscribers: 0
   });
+
+  // 查看问卷详情 - 改用路由导航
+  const viewSurveyDetails = (surveyId: string) => {
+    navigate(`/survey/${surveyId}`);
+  };
+
+  // 管理问卷 - 改用路由导航
+  const handleManageSurvey = (surveyId: string) => {
+    navigate(`/enterprise/manage/${surveyId}`);
+  };
+
+  // 创建新问卷
+  const createNewSurvey = () => {
+    navigate('/enterprise/create');
+  };
+
+  // 分享订阅链接
+  const shareSubscriptionLink = (serviceId: string) => {
+    const link = `${window.location.origin}/#/marketplace/subscription/${serviceId}`;
+    navigator.clipboard.writeText(link);
+    alert(`Subscription link copied:\n${link}`);
+  };
 
   // 获取单个问卷的详细信息
   const fetchSurveyDetails = async (surveyId: string): Promise<SurveyData | null> => {
@@ -370,19 +395,6 @@ export function MySurveys() {
     return (curr / maximum) * 100;
   };
 
-  const shareSubscriptionLink = (serviceId: string) => {
-    const link = `${window.location.origin}/subscription/${serviceId}`;
-    navigator.clipboard.writeText(link);
-    alert(`Subscription link copied:\n${link}`);
-  };
-
-  const handleManageSurvey = (surveyId: string) => {
-    const event = new CustomEvent('manageSurvey', { 
-      detail: { surveyId } 
-    });
-    window.dispatchEvent(event);
-  };
-
   const filteredSurveys = mySurveys.filter(survey => {
     if (activeTab === 'active') return survey.isActive;
     if (activeTab === 'completed') return !survey.isActive;
@@ -408,10 +420,16 @@ export function MySurveys() {
         <Flex direction="column" gap="3">
           <Flex justify="between" align="center">
             <Text size="5" weight="bold">My Surveys & Subscriptions</Text>
-            <Button onClick={loadMySurveys} variant="soft" disabled={loading}>
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Loading...' : 'Refresh'}
-            </Button>
+            <Flex gap="2">
+              <Button onClick={createNewSurvey}>
+                <Plus size={16} />
+                Create Survey
+              </Button>
+              <Button onClick={loadMySurveys} variant="soft" disabled={loading}>
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                {loading ? 'Loading...' : 'Refresh'}
+              </Button>
+            </Flex>
           </Flex>
           
           <Flex gap="3" wrap="wrap">
@@ -472,6 +490,12 @@ export function MySurveys() {
                activeTab === 'subscription' ? 'No surveys with subscription' :
                'No surveys created yet'}
             </Text>
+            {mySurveys.length === 0 && (
+              <Button onClick={createNewSurvey} variant="soft">
+                <Plus size={16} />
+                Create Your First Survey
+              </Button>
+            )}
           </Flex>
         </Card>
       ) : (
@@ -506,12 +530,7 @@ export function MySurveys() {
                     <Button 
                       size="2" 
                       variant="soft"
-                      onClick={() => {
-                        const event = new CustomEvent('viewSurveyDetails', { 
-                          detail: { surveyId: survey.id } 
-                        });
-                        window.dispatchEvent(event);
-                      }}
+                      onClick={() => viewSurveyDetails(survey.id)}
                     >
                       <Eye size={16} />
                       View
@@ -639,3 +658,5 @@ export function MySurveys() {
     </Flex>
   );
 }
+
+export default MySurveys;

@@ -1,9 +1,10 @@
-// View Survey Details Component
-// 查看问卷详情页面 - 接收 surveyId 参数
+// View Survey Details Component - Router Version
+// 查看问卷详情页面
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ConfigService } from '../services/config';
 import { ChevronLeft, Coins, Users, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
 
@@ -26,21 +27,25 @@ interface SurveyFullDetails {
   creator?: string;
 }
 
-interface ViewSurveyDetailsProps {
-  surveyId?: string;
-  onBack?: () => void;
-}
-
-export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurveyDetailsProps) {
+export function ViewSurveyDetails() {
+  const { surveyId } = useParams<{ surveyId: string }>();
+  const navigate = useNavigate();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   
-  // 可以通过 props 传入 surveyId，或者从 URL 参数获取
-  const [surveyId, setSurveyId] = useState(propSurveyId || '');
   const [surveyDetails, setSurveyDetails] = useState<SurveyFullDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasAnswered, setHasAnswered] = useState(false);
+
+  // Navigation functions
+  const goBack = () => {
+    navigate('/marketplace');
+  };
+
+  const startAnsweringSurvey = () => {
+    navigate(`/answer/${surveyId}`);
+  };
 
   // 获取问卷详情
   const fetchSurveyDetails = async (id: string) => {
@@ -131,16 +136,10 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
 
   // 当 surveyId 改变时自动加载详情
   useEffect(() => {
-    if (propSurveyId && propSurveyId !== surveyId) {
-      setSurveyId(propSurveyId);
-    }
-  }, [propSurveyId]);
-
-  useEffect(() => {
     if (surveyId) {
       fetchSurveyDetails(surveyId);
     }
-  }, [surveyId]);
+  }, [surveyId, currentAccount?.address]);
 
   // 格式化函数
   const getQuestionTypeLabel = (type: number) => {
@@ -178,6 +177,19 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
     ? (parseInt(surveyDetails.currentResponses) / parseInt(surveyDetails.maxResponses)) * 100 
     : 0;
 
+  if (!surveyId) {
+    return (
+      <Card>
+        <Flex direction="column" gap="3" align="center" py="5">
+          <Text size="3">No survey ID provided</Text>
+          <Button onClick={goBack} variant="soft">
+            <ChevronLeft size={16} /> Back to Marketplace
+          </Button>
+        </Flex>
+      </Card>
+    );
+  }
+
   if (loading) {
     return (
       <Card>
@@ -193,11 +205,9 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
       <Card>
         <Flex direction="column" gap="3" align="center" py="5">
           <Text size="3" color="red">Error: {error}</Text>
-          {onBack && (
-            <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> Go Back
-            </Button>
-          )}
+          <Button onClick={goBack} variant="soft">
+            <ChevronLeft size={16} /> Back to Marketplace
+          </Button>
         </Flex>
       </Card>
     );
@@ -208,11 +218,9 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
       <Card>
         <Flex direction="column" gap="3" align="center" py="5">
           <Text size="3">No survey details available</Text>
-          {onBack && (
-            <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> Go Back
-            </Button>
-          )}
+          <Button onClick={goBack} variant="soft">
+            <ChevronLeft size={16} /> Back to Marketplace
+          </Button>
         </Flex>
       </Card>
     );
@@ -221,18 +229,16 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
   return (
     <Flex direction="column" gap="3">
       {/* Navigation */}
-      {onBack && (
-        <Card>
-          <Flex justify="between" align="center">
-            <Button onClick={onBack} variant="ghost">
-              <ChevronLeft size={16} /> Back to All Surveys
-            </Button>
-            <Text size="2" color="gray">
-              Survey ID: {formatAddress(surveyId)}
-            </Text>
-          </Flex>
-        </Card>
-      )}
+      <Card>
+        <Flex justify="between" align="center">
+          <Button onClick={goBack} variant="ghost">
+            <ChevronLeft size={16} /> Back to Marketplace
+          </Button>
+          <Text size="2" color="gray">
+            Survey ID: {formatAddress(surveyId)}
+          </Text>
+        </Flex>
+      </Card>
 
       {/* Header */}
       <Card>
@@ -396,13 +402,7 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
             <Button 
               size="3" 
               style={{ width: '100%' }}
-              onClick={() => {
-                // 触发跳转到答题页面
-                const event = new CustomEvent('startAnswerSurvey', { 
-                  detail: { surveyId } 
-                });
-                window.dispatchEvent(event);
-              }}
+              onClick={startAnsweringSurvey}
             >
               Answer Survey & Earn {formatSUI(surveyDetails.rewardPerResponse)} SUI →
             </Button>
@@ -429,3 +429,5 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
     </Flex>
   );
 }
+
+export default ViewSurveyDetails;

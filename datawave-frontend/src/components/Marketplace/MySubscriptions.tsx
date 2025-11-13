@@ -1,9 +1,10 @@
-// My Subscriptions Page
+// My Subscriptions Page - Router Version
 // 管理用户的订阅，查看活跃和过期的订阅
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Grid, Tabs } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
 import { 
   Clock, 
@@ -36,6 +37,7 @@ interface UserSubscription {
 }
 
 export function MySubscriptions() {
+  const navigate = useNavigate();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   const packageId = ConfigService.getPackageId();
@@ -50,6 +52,18 @@ export function MySubscriptions() {
     expiredSubscriptions: 0,
     totalSpent: 0,
   });
+
+  // Navigation functions
+  const viewSurveyAnswers = (surveyId: string, subscriptionId: string) => {
+    // Navigate to subscription decrypt page with subscription info
+    navigate(`/subscription/decrypt/${surveyId}`, { 
+      state: { subscriptionId } 
+    });
+  };
+
+  const browseMoreSubscriptions = () => {
+    navigate('/marketplace/subscriptions');
+  };
 
   const loadUserSubscriptions = async () => {
     if (!currentAccount?.address) return;
@@ -201,25 +215,6 @@ export function MySubscriptions() {
     } else {
       return `${minutes}m remaining`;
     }
-  };
-
-  const viewSurveyAnswers = (surveyId: string, subscriptionId: string) => {
-    // Trigger navigation to subscription decrypt page
-    const event = new CustomEvent('viewSubscriptionAnswers', { 
-      detail: { 
-        surveyId,
-        subscriptionId
-      } 
-    });
-    window.dispatchEvent(event);
-  };
-
-  const browseMoreSubscriptions = () => {
-    // Trigger navigation to browse subscriptions
-    const event = new CustomEvent('navigateTo', { 
-      detail: { tab: 'browse-subscriptions' } 
-    });
-    window.dispatchEvent(event);
   };
 
   if (!currentAccount) {
@@ -464,3 +459,5 @@ export function MySubscriptions() {
     </Flex>
   );
 }
+
+export default MySubscriptions;

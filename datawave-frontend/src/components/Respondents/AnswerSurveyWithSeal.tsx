@@ -1,9 +1,10 @@
-// Answer Survey Component with Seal & Walrus Integration
+// Answer Survey Component with Seal & Walrus Integration - Router Version
 // 基于官方示例修正的版本
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, RadioGroup, Checkbox, TextArea, Switch, Spinner } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Transaction } from "@mysten/sui/transactions";
 import { ConfigService } from '../../services/config';
 import { SealClient } from '@mysten/seal';
@@ -43,11 +44,6 @@ interface Answer {
   questionText: string;
   questionType: number;
   answer: string | string[];
-}
-
-interface AnswerSurveyProps {
-  surveyId: string;
-  onBack?: () => void;
 }
 
 // Walrus service configuration
@@ -97,7 +93,10 @@ const walrusServices: WalrusService[] = [
   },
 ];
 
-export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
+// 移除了 props，改用路由参数
+export function AnswerSurveyWithSeal() {
+  const { surveyId } = useParams<{ surveyId: string }>();
+  const navigate = useNavigate();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   const { mutate: signAndExecute } = useSignAndExecuteTransaction();
@@ -280,7 +279,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
     }
   };
 
-  // 提交答案 - 基于官方示例的版本
+  // 提交答案 - 基于官方示例的版本（修改导航部分）
   const submitAnswers = async () => {
     if (!survey || !currentAccount?.address) return;
 
@@ -435,9 +434,10 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
             
             setHasAnswered(true);
             
-            if (onBack) {
-              setTimeout(onBack, 2000);
-            }
+            // 修改：使用路由导航而不是回调
+            setTimeout(() => {
+              navigate('/earn/my-answers');
+            }, 2000);
           },
           onError: (error) => {
             console.error('交易错误:', error);
@@ -477,11 +477,9 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
       <Card>
         <Flex direction="column" align="center" gap="3" py="5">
           <Text size="4">未找到问卷</Text>
-          {onBack && (
-            <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> 返回问卷列表
-            </Button>
-          )}
+          <Button onClick={() => navigate('/earn/browse')} variant="soft">
+            <ChevronLeft size={16} /> 返回问卷列表
+          </Button>
         </Flex>
       </Card>
     );
@@ -494,11 +492,9 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
           <CheckCircle size={48} color="green" />
           <Text size="4" weight="bold">您已经回答过这个问卷</Text>
           <Text size="2" color="gray">感谢您的参与！</Text>
-          {onBack && (
-            <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> 返回问卷列表
-            </Button>
-          )}
+          <Button onClick={() => navigate('/earn/my-answers')} variant="soft">
+            查看我的回答
+          </Button>
         </Flex>
       </Card>
     );
@@ -510,11 +506,9 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
         <Flex direction="column" align="center" gap="3" py="5">
           <AlertCircle size={48} color="orange" />
           <Text size="4" weight="bold">问卷已经关闭</Text>
-          {onBack && (
-            <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> 返回问卷列表
-            </Button>
-          )}
+          <Button onClick={() => navigate('/earn/browse')} variant="soft">
+            <ChevronLeft size={16} /> 返回问卷列表
+          </Button>
         </Flex>
       </Card>
     );
@@ -566,8 +560,9 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
         </Flex>
       </Card>
 
-      {/* Question Card */}
+      {/* Question Card - 保持不变 */}
       <Card>
+        {/* ... 问题内容保持不变 ... */}
         <Flex direction="column" gap="3">
           <Flex align="center" gap="2">
             <Text size="3" weight="bold">Q{currentQuestionIndex + 1}.</Text>
@@ -630,7 +625,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
         </Flex>
       </Card>
 
-      {/* Settings on last question */}
+      {/* Settings on last question - 保持不变 */}
       {isLastQuestion && (
         <>
           <Card style={{ backgroundColor: 'var(--blue-2)' }}>
@@ -673,7 +668,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
         </>
       )}
 
-      {/* Navigation */}
+      {/* Navigation - 保持不变 */}
       <Card>
         <Flex justify="between" align="center">
           <Button
@@ -713,7 +708,7 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
         </Flex>
       </Card>
 
-      {/* Status Display */}
+      {/* Status Display - 保持不变 */}
       {uploadingStep !== 'idle' && (
         <Card style={{ backgroundColor: 'var(--gray-2)' }}>
           <Flex align="center" gap="2">
@@ -727,3 +722,5 @@ export function AnswerSurveyWithSeal({ surveyId, onBack }: AnswerSurveyProps) {
     </Flex>
   );
 }
+
+export default AnswerSurveyWithSeal;

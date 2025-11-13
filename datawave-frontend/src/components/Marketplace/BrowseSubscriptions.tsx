@@ -1,9 +1,10 @@
-// Browse Subscription Services - 基于MySurveys的逻辑
+// Browse Subscription Services - Router Version
 // 获取所有开启订阅服务的问卷并支持购买
 
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Grid, TextField } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
 import { ConfigService } from '../../services/config';
 import { 
@@ -48,6 +49,7 @@ interface SubscriptionSurvey {
 }
 
 export function BrowseSubscriptions() {
+  const navigate = useNavigate();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   const packageId = ConfigService.getPackageId();
@@ -86,6 +88,18 @@ export function BrowseSubscriptions() {
         },
       }),
   });
+
+  // Navigation functions
+  const viewSurveyDetails = (surveyId: string) => {
+    navigate(`/survey/${surveyId}`);
+  };
+
+  const viewSubscriptionAnswers = (surveyId: string, subscriptionId?: string) => {
+    // 导航到带有订阅权限的解密页面
+    navigate(`/subscription/decrypt/${surveyId}`, { 
+      state: { subscriptionId } 
+    });
+  };
 
   // 加载所有有订阅服务的问卷
   const loadSubscriptionSurveys = async () => {
@@ -375,18 +389,6 @@ export function BrowseSubscriptions() {
     return `${hours}h remaining`;
   };
 
-  const handleViewAnswers = (service: SubscriptionSurvey) => {
-    if (!service.userSubscriptionId) return;
-    
-    const event = new CustomEvent('viewSubscriptionAnswers', { 
-      detail: { 
-        surveyId: service.surveyId,
-        subscriptionId: service.userSubscriptionId
-      } 
-    });
-    window.dispatchEvent(event);
-  };
-
   return (
     <Flex direction="column" gap="3">
       {/* Header with Stats */}
@@ -500,7 +502,14 @@ export function BrowseSubscriptions() {
                       </Badge>
                     )}
                   </Flex>
-                  <Text size="3" weight="bold">{service.title}</Text>
+                  <Text 
+                    size="3" 
+                    weight="bold" 
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => viewSurveyDetails(service.surveyId)}
+                  >
+                    {service.title}
+                  </Text>
                   <Text size="2" color="gray" style={{ 
                     marginTop: '4px',
                     display: '-webkit-box',
@@ -595,7 +604,7 @@ export function BrowseSubscriptions() {
                     <Button 
                       size="2" 
                       variant="soft"
-                      onClick={() => handleViewAnswers(service)}
+                      onClick={() => viewSubscriptionAnswers(service.surveyId, service.userSubscriptionId)}
                     >
                       <Eye size={16} />
                       View Survey Answers
@@ -685,3 +694,5 @@ export function BrowseSubscriptions() {
     </Flex>
   );
 }
+
+export default BrowseSubscriptions;

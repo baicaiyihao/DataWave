@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, Grid, Select, TextField } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
-import { ConfigService } from '../services/config';
+import { ConfigService } from '../../services/config';
 import { ChevronLeft, ChevronRight, RefreshCw, Search, Filter } from 'lucide-react';
 
 interface SurveyBasicInfo {

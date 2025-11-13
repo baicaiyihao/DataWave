@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, Card, Flex, TextField, Text, TextArea, Badge } from '@radix-ui/themes';
 import { useSignAndExecuteTransaction, useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { Transaction } from "@mysten/sui/transactions";
-import { ConfigService } from '../services/config';
+import { ConfigService } from '../../services/config';
 import { Trash2, Plus, Coins } from 'lucide-react';
 
 // 问题类型枚举

@@ -7,7 +7,7 @@ import { useSignPersonalMessage, useSuiClient, useCurrentAccount } from '@mysten
 import { Transaction } from '@mysten/sui/transactions';
 import { fromHex } from '@mysten/sui/utils';
 import { SealClient, SessionKey, EncryptedObject, NoAccessError } from '@mysten/seal';
-import { ConfigService } from '../services/config';
+import { ConfigService } from '../../services/config';
 import { Lock, Unlock, Eye, Key, AlertCircle, Download } from 'lucide-react';
 import { set, get } from 'idb-keyval';
 

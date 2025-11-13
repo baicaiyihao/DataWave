@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Flex, Text, Badge, Button, RadioGroup, Checkbox, TextArea, Switch, Spinner } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from "@mysten/sui/transactions";
-import { ConfigService } from '../services/config';
+import { ConfigService } from '../../services/config';
 import { SealClient } from '@mysten/seal';
 import { fromHex, toHex } from '@mysten/sui/utils';
 import { 

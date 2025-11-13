@@ -13,7 +13,10 @@ use sui::sui::SUI;
 use sui::clock::{Self, Clock};
 use datawave::utils::is_prefix;
 
-// ======== Constants ========
+// ================================================================================
+// CONSTANTS & ERROR CODES
+// ================================================================================
+
 const EInvalidOwner: u64 = 0;
 const ESurveyNotFound: u64 = 1;
 const EAlreadyAnswered: u64 = 2;
@@ -22,18 +25,19 @@ const ENotInAllowlist: u64 = 4;
 const ESubscriptionExpired: u64 = 6;
 const ESurveyNotActive: u64 = 7;
 const EDuplicateInAllowlist: u64 = 9;
-
-const EInvalidNamespace: u64 = 10;  // ID前缀不匹配
-const ECallerNotInAllowlist: u64 = 11;  // 调用者不在allowlist中
-const EInvalidSubscriptionOwner: u64 = 12;  // 订阅所有者不匹配
-const EInvalidServiceId: u64 = 13;  // Service ID不匹配
-const EInvalidSurveyId: u64 = 14;  // Survey ID不匹配
-
+const EInvalidNamespace: u64 = 10;
+const ECallerNotInAllowlist: u64 = 11;
+const EInvalidSubscriptionOwner: u64 = 12;
+const EInvalidServiceId: u64 = 13;
+const EInvalidSurveyId: u64 = 14;
+const ESubscriptionServiceAlreadyExists: u64 = 15;
 
 // Marker for blob storage (following Seal demo pattern)
 const MARKER: u64 = 3;
 
-// ======== Structs ========
+// ================================================================================
+// STRUCTS - Core Data Structures
+// ================================================================================
 
 /// Main survey object created by merchant
 public struct Survey has key, store {
@@ -59,6 +63,8 @@ public struct Survey has key, store {
     consenting_users_count: u64,
     // Track addresses of consenting users for dividend distribution
     consenting_users: vector<address>,
+    // NEW: Store subscription service ID if exists
+    subscription_service_id: Option<ID>,
 }
 
 /// Individual question in a survey
@@ -151,7 +157,9 @@ public struct AdminCap has key, store {
     id: UID,
 }
 
-// ======== Events ========
+// ================================================================================
+// EVENTS
+// ================================================================================
 
 public struct SurveyCreated has copy, drop {
     survey_id: ID,
@@ -181,7 +189,22 @@ public struct DividendDistributed has copy, drop {
     num_recipients: u64,
 }
 
-// ======== Initialization ========
+public struct SubscriptionServiceCreated has copy, drop {
+    service_id: ID,
+    survey_id: ID,
+    price: u64,
+    duration_ms: u64,
+}
+
+public struct UserAnsweredCheck has copy, drop {
+    survey_id: ID,
+    user: address,
+    has_answered: bool,
+}
+
+// ================================================================================
+// INITIALIZATION
+// ================================================================================
 
 fun init(ctx: &mut TxContext) {
     // Create platform treasury
@@ -212,7 +235,9 @@ fun init(ctx: &mut TxContext) {
     transfer::transfer(admin_cap, ctx.sender());
 }
 
-// ======== Merchant Functions ========
+// ================================================================================
+// MERCHANT FUNCTIONS
+// ================================================================================
 
 /// Create a new survey
 public fun create_survey(
@@ -252,6 +277,7 @@ public fun create_survey(
         encrypted_answer_blobs: table::new(ctx),
         consenting_users_count: 0,
         consenting_users: vector::empty(),
+        subscription_service_id: option::none(),  // Initialize as None
     };
 
     // Add creator to allowlist by default
@@ -456,15 +482,17 @@ public fun remove_from_allowlist(
     vec_set::remove(&mut survey.allowlist, &account);
 }
 
-/// Create subscription service for a survey
+/// Create subscription service for a survey (MODIFIED to record ID in Survey)
 public fun create_subscription_service(
-    survey: &Survey,
+    survey: &mut Survey,  // Changed to mutable reference
     cap: &SurveyCap,
     price: u64,
     duration_ms: u64,
     ctx: &mut TxContext,
 ) {
     assert!(cap.survey_id == object::id(survey), EInvalidOwner);
+    // Check if subscription service already exists
+    assert!(option::is_none(&survey.subscription_service_id), ESubscriptionServiceAlreadyExists);
     
     let service = SubscriptionService {
         id: object::new(ctx),
@@ -475,6 +503,19 @@ public fun create_subscription_service(
         total_revenue: 0,
         subscribers: table::new(ctx),
     };
+    
+    let service_id = object::id(&service);
+    
+    // Store service ID in survey
+    option::fill(&mut survey.subscription_service_id, service_id);
+    
+    // Emit event
+    event::emit(SubscriptionServiceCreated {
+        service_id,
+        survey_id: object::id(survey),
+        price,
+        duration_ms,
+    });
     
     transfer::share_object(service);
 }
@@ -541,7 +582,9 @@ public fun purchase_subscription(
     subscription
 }
 
-// ======== Seal Integration Functions ========
+// ================================================================================
+// SEAL INTEGRATION FUNCTIONS
+// ================================================================================
 
 /// Get namespace for Seal encryption - returns survey ID bytes
 public fun survey_namespace(survey: &Survey): vector<u8> {
@@ -564,6 +607,7 @@ public fun seal_approve_allowlist(
     // Check if user is in allowlist
     assert!(vec_set::contains(&survey.allowlist, &caller), ECallerNotInAllowlist);  // Error 11
 }
+
 /// Check if subscription is valid for accessing survey answers
 /// Key format: [survey_id][nonce] - matches Seal demo pattern
 public fun seal_approve_subscription(
@@ -594,7 +638,9 @@ public fun seal_approve_subscription(
     assert!(is_prefix(namespace, id), EInvalidNamespace);  // Error 10
 }
 
-// ======== Helper Functions ========
+// ================================================================================
+// HELPER FUNCTIONS
+// ================================================================================
 
 /// Distribute dividends to users who gave consent
 fun distribute_dividends(
@@ -633,18 +679,53 @@ fun distribute_dividends(
     }
 }
 
-// ======== View Functions ========
+/// Add questions to a survey (can only be done before any answers)
+public fun add_questions(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    questions: vector<Question>,
+    clock: &Clock,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidOwner);
+    // Only allow adding questions if no one has answered yet
+    assert!(survey.current_responses == 0, EAlreadyAnswered);
+    
+    // Add questions to the survey
+    let mut i = 0;
+    while (i < vector::length(&questions)) {
+        let question = *vector::borrow(&questions, i);
+        vector::push_back(&mut survey.questions, question);
+        i = i + 1;
+    };
+    
+    survey.updated_at = clock::timestamp_ms(clock);
+}
 
-/// Get survey details
-public fun get_survey_info(survey: &Survey): (String, String, u64, u64, u64, bool) {
+// ================================================================================
+// VIEW FUNCTIONS
+// ================================================================================
+
+/// Get survey details (MODIFIED to include subscription_service_id)
+public fun get_survey_info(survey: &Survey): (String, String, u64, u64, u64, bool, Option<ID>) {
     (
         survey.title,
         survey.description,
         survey.reward_per_response,
         survey.max_responses,
         survey.current_responses,
-        survey.is_active
+        survey.is_active,
+        survey.subscription_service_id  // Return subscription service ID
     )
+}
+
+/// Check if survey has subscription service
+public fun has_subscription_service(survey: &Survey): bool {
+    option::is_some(&survey.subscription_service_id)
+}
+
+/// Get subscription service ID if exists
+public fun get_subscription_service_id(survey: &Survey): Option<ID> {
+    survey.subscription_service_id
 }
 
 /// Get all encrypted answer blob IDs for a survey
@@ -697,232 +778,6 @@ public fun get_category_surveys(registry: &SurveyRegistry, category: String): ve
         vector::empty()
     }
 }
-
-/// Add questions to a survey (can only be done before any answers)
-public fun add_questions(
-    survey: &mut Survey,
-    cap: &SurveyCap,
-    questions: vector<Question>,
-    clock: &Clock,
-) {
-    assert!(cap.survey_id == object::id(survey), EInvalidOwner);
-    // Only allow adding questions if no one has answered yet
-    assert!(survey.current_responses == 0, EAlreadyAnswered);
-    
-    // Add questions to the survey
-    let mut i = 0;
-    while (i < vector::length(&questions)) {
-        let question = *vector::borrow(&questions, i);
-        vector::push_back(&mut survey.questions, question);
-        i = i + 1;
-    };
-    
-    survey.updated_at = clock::timestamp_ms(clock);
-}
-
-// ======== Admin Functions ========
-
-/// Withdraw platform fees (admin only)
-public fun withdraw_fees(
-    treasury: &mut PlatformTreasury,
-    _cap: &AdminCap,
-    amount: u64,
-    recipient: address,
-    ctx: &mut TxContext,
-) {
-    assert!(amount <= treasury.total_fees, EInsufficientPayment);
-    
-    if (df::exists_(&treasury.id, b"accumulated_fees")) {
-        let mut coin = df::remove<vector<u8>, Coin<SUI>>(&mut treasury.id, b"accumulated_fees");
-        
-        if (coin::value(&coin) >= amount) {
-            let payment = coin::split(&mut coin, amount, ctx);
-            transfer::public_transfer(payment, recipient);
-            
-            if (coin::value(&coin) > 0) {
-                df::add(&mut treasury.id, b"accumulated_fees", coin);
-            } else {
-                coin::destroy_zero(coin);
-            };
-            
-            treasury.total_fees = treasury.total_fees - amount;
-        } else {
-            df::add(&mut treasury.id, b"accumulated_fees", coin);
-        }
-    }
-}
-
-/// Update platform fee rate (admin only)
-public fun update_fee_rate(
-    treasury: &mut PlatformTreasury,
-    _cap: &AdminCap,
-    new_rate: u64,
-) {
-    treasury.platform_fee_rate = new_rate;
-}
-
-// ======== Entry Functions ========
-
-/// Enhanced entry function to create survey with questions
-entry fun create_survey_with_questions_entry(
-    title: vector<u8>,
-    description: vector<u8>,
-    category: vector<u8>,
-    question_texts: vector<vector<u8>>,
-    question_types: vector<u8>,
-    question_options: vector<vector<vector<u8>>>,
-    reward_per_response: u64,
-    max_responses: u64,
-    payment: Coin<SUI>,
-    registry: &mut SurveyRegistry,
-    clock: &Clock,
-    ctx: &mut TxContext,
-) {
-    // Build questions
-    let mut questions = vector::empty<Question>();
-    let mut i = 0;
-    
-    while (i < vector::length(&question_texts)) {
-        let text = utf8(*vector::borrow(&question_texts, i));
-        let q_type = *vector::borrow(&question_types, i);
-        
-        // Convert options for this question
-        let options_raw = if (i < vector::length(&question_options)) {
-            vector::borrow(&question_options, i)
-        } else {
-            &vector::empty<vector<u8>>()
-        };
-        
-        let mut options = vector::empty<String>();
-        let mut j = 0;
-        while (j < vector::length(options_raw)) {
-            let option = utf8(*vector::borrow(options_raw, j));
-            vector::push_back(&mut options, option);
-            j = j + 1;
-        };
-        
-        let question = Question {
-            question_text: text,
-            question_type: q_type,
-            options,
-        };
-        
-        vector::push_back(&mut questions, question);
-        i = i + 1;
-    };
-    
-    let cap = create_survey(
-        utf8(title),
-        utf8(description),
-        utf8(category),
-        questions,
-        reward_per_response,
-        max_responses,
-        payment,
-        registry,
-        clock,
-        ctx
-    );
-    
-    transfer::transfer(cap, ctx.sender());
-}
-
-
-/// Entry function to add questions
-entry fun add_questions_entry(
-    survey: &mut Survey,
-    cap: &SurveyCap,
-    question_texts: vector<vector<u8>>,
-    question_types: vector<u8>,
-    question_options: vector<vector<vector<u8>>>, // Nested vector for options
-    clock: &Clock,
-) {
-    let mut questions = vector::empty<Question>();
-    let mut i = 0;
-    
-    while (i < vector::length(&question_texts)) {
-        let text = utf8(*vector::borrow(&question_texts, i));
-        let q_type = *vector::borrow(&question_types, i);
-        
-        // Convert options
-        let options_raw = vector::borrow(&question_options, i);
-        let mut options = vector::empty<String>();
-        let mut j = 0;
-        while (j < vector::length(options_raw)) {
-            let option = utf8(*vector::borrow(options_raw, j));
-            vector::push_back(&mut options, option);
-            j = j + 1;
-        };
-        
-        let question = Question {
-            question_text: text,
-            question_type: q_type,
-            options,
-        };
-        
-        vector::push_back(&mut questions, question);
-        i = i + 1;
-    };
-    
-    add_questions(survey, cap, questions, clock);
-}
-
-/// Entry function to submit answer with blob ID
-entry fun submit_answer_entry(
-    survey: &mut Survey,
-    blob_id: vector<u8>,
-    seal_key_id: vector<u8>,
-    consent_for_subscription: bool,
-    treasury: &mut PlatformTreasury,
-    registry: &mut SurveyRegistry,
-    clock: &Clock,
-    ctx: &mut TxContext,
-) {
-    submit_answer(
-        survey,
-        utf8(blob_id),
-        utf8(seal_key_id),
-        consent_for_subscription,
-        treasury,
-        registry,
-        clock,
-        ctx
-    );
-}
-
-/// Entry function to create subscription service
-entry fun create_subscription_service_entry(
-    survey: &Survey,
-    cap: &SurveyCap,
-    price: u64,
-    duration_ms: u64,
-    ctx: &mut TxContext,
-) {
-    create_subscription_service(survey, cap, price, duration_ms, ctx);
-}
-
-/// Entry function to purchase subscription
-entry fun purchase_subscription_entry(
-    service: &mut SubscriptionService,
-    survey: &Survey,
-    payment: Coin<SUI>,
-    treasury: &mut PlatformTreasury,
-    clock: &Clock,
-    ctx: &mut TxContext,
-) {
-    let subscription = purchase_subscription(
-        service,
-        survey,
-        payment,
-        treasury,
-        clock,
-        ctx
-    );
-    transfer::transfer(subscription, ctx.sender());
-}
-
-// ======== Enhanced View Functions ========
-
 
 /// Get survey full details including questions
 public fun get_survey_full_details(survey: &Survey): (
@@ -1119,7 +974,209 @@ public fun get_answer_blob_details(blob: &EncryptedAnswerBlob): (
     )
 }
 
-// ======== Entry Functions for View Operations ========
+// ================================================================================
+// ADMIN FUNCTIONS
+// ================================================================================
+
+/// Withdraw platform fees (admin only)
+public fun withdraw_fees(
+    treasury: &mut PlatformTreasury,
+    _cap: &AdminCap,
+    amount: u64,
+    recipient: address,
+    ctx: &mut TxContext,
+) {
+    assert!(amount <= treasury.total_fees, EInsufficientPayment);
+    
+    if (df::exists_(&treasury.id, b"accumulated_fees")) {
+        let mut coin = df::remove<vector<u8>, Coin<SUI>>(&mut treasury.id, b"accumulated_fees");
+        
+        if (coin::value(&coin) >= amount) {
+            let payment = coin::split(&mut coin, amount, ctx);
+            transfer::public_transfer(payment, recipient);
+            
+            if (coin::value(&coin) > 0) {
+                df::add(&mut treasury.id, b"accumulated_fees", coin);
+            } else {
+                coin::destroy_zero(coin);
+            };
+            
+            treasury.total_fees = treasury.total_fees - amount;
+        } else {
+            df::add(&mut treasury.id, b"accumulated_fees", coin);
+        }
+    }
+}
+
+/// Update platform fee rate (admin only)
+public fun update_fee_rate(
+    treasury: &mut PlatformTreasury,
+    _cap: &AdminCap,
+    new_rate: u64,
+) {
+    treasury.platform_fee_rate = new_rate;
+}
+
+// ================================================================================
+// ENTRY FUNCTIONS
+// ================================================================================
+
+/// Enhanced entry function to create survey with questions
+entry fun create_survey_with_questions_entry(
+    title: vector<u8>,
+    description: vector<u8>,
+    category: vector<u8>,
+    question_texts: vector<vector<u8>>,
+    question_types: vector<u8>,
+    question_options: vector<vector<vector<u8>>>,
+    reward_per_response: u64,
+    max_responses: u64,
+    payment: Coin<SUI>,
+    registry: &mut SurveyRegistry,
+    clock: &Clock,
+    ctx: &mut TxContext,
+) {
+    // Build questions
+    let mut questions = vector::empty<Question>();
+    let mut i = 0;
+    
+    while (i < vector::length(&question_texts)) {
+        let text = utf8(*vector::borrow(&question_texts, i));
+        let q_type = *vector::borrow(&question_types, i);
+        
+        // Convert options for this question
+        let options_raw = if (i < vector::length(&question_options)) {
+            vector::borrow(&question_options, i)
+        } else {
+            &vector::empty<vector<u8>>()
+        };
+        
+        let mut options = vector::empty<String>();
+        let mut j = 0;
+        while (j < vector::length(options_raw)) {
+            let option = utf8(*vector::borrow(options_raw, j));
+            vector::push_back(&mut options, option);
+            j = j + 1;
+        };
+        
+        let question = Question {
+            question_text: text,
+            question_type: q_type,
+            options,
+        };
+        
+        vector::push_back(&mut questions, question);
+        i = i + 1;
+    };
+    
+    let cap = create_survey(
+        utf8(title),
+        utf8(description),
+        utf8(category),
+        questions,
+        reward_per_response,
+        max_responses,
+        payment,
+        registry,
+        clock,
+        ctx
+    );
+    
+    transfer::transfer(cap, ctx.sender());
+}
+
+/// Entry function to add questions
+entry fun add_questions_entry(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    question_texts: vector<vector<u8>>,
+    question_types: vector<u8>,
+    question_options: vector<vector<vector<u8>>>, // Nested vector for options
+    clock: &Clock,
+) {
+    let mut questions = vector::empty<Question>();
+    let mut i = 0;
+    
+    while (i < vector::length(&question_texts)) {
+        let text = utf8(*vector::borrow(&question_texts, i));
+        let q_type = *vector::borrow(&question_types, i);
+        
+        // Convert options
+        let options_raw = vector::borrow(&question_options, i);
+        let mut options = vector::empty<String>();
+        let mut j = 0;
+        while (j < vector::length(options_raw)) {
+            let option = utf8(*vector::borrow(options_raw, j));
+            vector::push_back(&mut options, option);
+            j = j + 1;
+        };
+        
+        let question = Question {
+            question_text: text,
+            question_type: q_type,
+            options,
+        };
+        
+        vector::push_back(&mut questions, question);
+        i = i + 1;
+    };
+    
+    add_questions(survey, cap, questions, clock);
+}
+
+/// Entry function to submit answer with blob ID
+entry fun submit_answer_entry(
+    survey: &mut Survey,
+    blob_id: vector<u8>,
+    seal_key_id: vector<u8>,
+    consent_for_subscription: bool,
+    treasury: &mut PlatformTreasury,
+    registry: &mut SurveyRegistry,
+    clock: &Clock,
+    ctx: &mut TxContext,
+) {
+    submit_answer(
+        survey,
+        utf8(blob_id),
+        utf8(seal_key_id),
+        consent_for_subscription,
+        treasury,
+        registry,
+        clock,
+        ctx
+    );
+}
+
+/// Entry function to create subscription service (MODIFIED)
+entry fun create_subscription_service_entry(
+    survey: &mut Survey,  // Changed to mutable reference
+    cap: &SurveyCap,
+    price: u64,
+    duration_ms: u64,
+    ctx: &mut TxContext,
+) {
+    create_subscription_service(survey, cap, price, duration_ms, ctx);
+}
+
+/// Entry function to purchase subscription
+entry fun purchase_subscription_entry(
+    service: &mut SubscriptionService,
+    survey: &Survey,
+    payment: Coin<SUI>,
+    treasury: &mut PlatformTreasury,
+    clock: &Clock,
+    ctx: &mut TxContext,
+) {
+    let subscription = purchase_subscription(
+        service,
+        survey,
+        payment,
+        treasury,
+        clock,
+        ctx
+    );
+    transfer::transfer(subscription, ctx.sender());
+}
 
 /// Entry function to check if user answered (returns via event)
 entry fun check_if_answered_entry(
@@ -1133,11 +1190,4 @@ entry fun check_if_answered_entry(
         user,
         has_answered: answered
     });
-}
-
-// ======== Event for query results ========
-public struct UserAnsweredCheck has copy, drop {
-    survey_id: ID,
-    user: address,
-    has_answered: bool,
 }

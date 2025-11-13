@@ -13,7 +13,10 @@ use sui::sui::SUI;
 use sui::clock::{Self, Clock};
 use datawave::utils::is_prefix;
 
-// ======== Constants ========
+// ================================================================================
+// CONSTANTS & ERROR CODES
+// ================================================================================
+
 const EInvalidOwner: u64 = 0;
 const ESurveyNotFound: u64 = 1;
 const EAlreadyAnswered: u64 = 2;
@@ -22,11 +25,19 @@ const ENotInAllowlist: u64 = 4;
 const ESubscriptionExpired: u64 = 6;
 const ESurveyNotActive: u64 = 7;
 const EDuplicateInAllowlist: u64 = 9;
+const EInvalidNamespace: u64 = 10;
+const ECallerNotInAllowlist: u64 = 11;
+const EInvalidSubscriptionOwner: u64 = 12;
+const EInvalidServiceId: u64 = 13;
+const EInvalidSurveyId: u64 = 14;
+const ESubscriptionServiceAlreadyExists: u64 = 15;
 
 // Marker for blob storage (following Seal demo pattern)
 const MARKER: u64 = 3;
 
-// ======== Structs ========
+// ================================================================================
+// STRUCTS - Core Data Structures
+// ================================================================================
 
 /// Main survey object created by merchant
 public struct Survey has key, store {
@@ -52,6 +63,8 @@ public struct Survey has key, store {
     consenting_users_count: u64,
     // Track addresses of consenting users for dividend distribution
     consenting_users: vector<address>,
+    // NEW: Store subscription service ID if exists
+    subscription_service_id: Option<ID>,
 }
 
 /// Individual question in a survey
@@ -144,7 +157,9 @@ public struct AdminCap has key, store {
     id: UID,
 }
 
-// ======== Events ========
+// ================================================================================
+// EVENTS
+// ================================================================================
 
 public struct SurveyCreated has copy, drop {
     survey_id: ID,
@@ -174,7 +189,22 @@ public struct DividendDistributed has copy, drop {
     num_recipients: u64,
 }
 
-// ======== Initialization ========
+public struct SubscriptionServiceCreated has copy, drop {
+    service_id: ID,
+    survey_id: ID,
+    price: u64,
+    duration_ms: u64,
+}
+
+public struct UserAnsweredCheck has copy, drop {
+    survey_id: ID,
+    user: address,
+    has_answered: bool,
+}
+
+// ================================================================================
+// INITIALIZATION
+// ================================================================================
 
 fun init(ctx: &mut TxContext) {
     // Create platform treasury
@@ -205,7 +235,9 @@ fun init(ctx: &mut TxContext) {
     transfer::transfer(admin_cap, ctx.sender());
 }
 
-// ======== Merchant Functions ========
+// ================================================================================
+// MERCHANT FUNCTIONS
+// ================================================================================
 
 /// Create a new survey
 public fun create_survey(
@@ -245,6 +277,7 @@ public fun create_survey(
         encrypted_answer_blobs: table::new(ctx),
         consenting_users_count: 0,
         consenting_users: vector::empty(),
+        subscription_service_id: option::none(),  // Initialize as None
     };
 
     // Add creator to allowlist by default
@@ -449,15 +482,17 @@ public fun remove_from_allowlist(
     vec_set::remove(&mut survey.allowlist, &account);
 }
 
-/// Create subscription service for a survey
+/// Create subscription service for a survey (MODIFIED to record ID in Survey)
 public fun create_subscription_service(
-    survey: &Survey,
+    survey: &mut Survey,  // Changed to mutable reference
     cap: &SurveyCap,
     price: u64,
     duration_ms: u64,
     ctx: &mut TxContext,
 ) {
     assert!(cap.survey_id == object::id(survey), EInvalidOwner);
+    // Check if subscription service already exists
+    assert!(option::is_none(&survey.subscription_service_id), ESubscriptionServiceAlreadyExists);
     
     let service = SubscriptionService {
         id: object::new(ctx),
@@ -468,6 +503,19 @@ public fun create_subscription_service(
         total_revenue: 0,
         subscribers: table::new(ctx),
     };
+    
+    let service_id = object::id(&service);
+    
+    // Store service ID in survey
+    option::fill(&mut survey.subscription_service_id, service_id);
+    
+    // Emit event
+    event::emit(SubscriptionServiceCreated {
+        service_id,
+        survey_id: object::id(survey),
+        price,
+        duration_ms,
+    });
     
     transfer::share_object(service);
 }
@@ -534,7 +582,9 @@ public fun purchase_subscription(
     subscription
 }
 
-// ======== Seal Integration Functions ========
+// ================================================================================
+// SEAL INTEGRATION FUNCTIONS
+// ================================================================================
 
 /// Get namespace for Seal encryption - returns survey ID bytes
 public fun survey_namespace(survey: &Survey): vector<u8> {
@@ -552,10 +602,10 @@ public fun seal_approve_allowlist(
     
     // Check if the id has the right prefix (survey_id)
     let namespace = survey_namespace(survey);
-    assert!(is_prefix(namespace, id), ENotInAllowlist);
+    assert!(is_prefix(namespace, id), EInvalidNamespace);  // Error 10
     
     // Check if user is in allowlist
-    assert!(vec_set::contains(&survey.allowlist, &caller), ENotInAllowlist);
+    assert!(vec_set::contains(&survey.allowlist, &caller), ECallerNotInAllowlist);  // Error 11
 }
 
 /// Check if subscription is valid for accessing survey answers
@@ -571,22 +621,26 @@ public fun seal_approve_subscription(
     let caller = ctx.sender();
     
     // Verify subscription ownership
-    assert!(subscription.subscriber == caller, ENotInAllowlist);
+    assert!(subscription.subscriber == caller, EInvalidSubscriptionOwner);  // Error 12
     
-    // Verify subscription matches service and survey
-    assert!(subscription.service_id == object::id(service), ESubscriptionExpired);
-    assert!(subscription.survey_id == object::id(survey), ESurveyNotFound);
-    assert!(service.survey_id == object::id(survey), ESurveyNotFound);
+    // Verify subscription matches service
+    assert!(subscription.service_id == object::id(service), EInvalidServiceId);  // Error 13
+    
+    // Verify survey IDs match
+    assert!(subscription.survey_id == object::id(survey), EInvalidSurveyId);  // Error 14
+    assert!(service.survey_id == object::id(survey), EInvalidSurveyId);  // Error 14
     
     // Check if subscription is still valid
-    assert!(clock::timestamp_ms(clock) < subscription.expires_at, ESubscriptionExpired);
+    assert!(clock::timestamp_ms(clock) < subscription.expires_at, ESubscriptionExpired);  // Error 6
     
     // Check if the id has the right prefix (survey_id)
     let namespace = survey_namespace(survey);
-    assert!(is_prefix(namespace, id), ENotInAllowlist);
+    assert!(is_prefix(namespace, id), EInvalidNamespace);  // Error 10
 }
 
-// ======== Helper Functions ========
+// ================================================================================
+// HELPER FUNCTIONS
+// ================================================================================
 
 /// Distribute dividends to users who gave consent
 fun distribute_dividends(
@@ -625,18 +679,53 @@ fun distribute_dividends(
     }
 }
 
-// ======== View Functions ========
+/// Add questions to a survey (can only be done before any answers)
+public fun add_questions(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    questions: vector<Question>,
+    clock: &Clock,
+) {
+    assert!(cap.survey_id == object::id(survey), EInvalidOwner);
+    // Only allow adding questions if no one has answered yet
+    assert!(survey.current_responses == 0, EAlreadyAnswered);
+    
+    // Add questions to the survey
+    let mut i = 0;
+    while (i < vector::length(&questions)) {
+        let question = *vector::borrow(&questions, i);
+        vector::push_back(&mut survey.questions, question);
+        i = i + 1;
+    };
+    
+    survey.updated_at = clock::timestamp_ms(clock);
+}
 
-/// Get survey details
-public fun get_survey_info(survey: &Survey): (String, String, u64, u64, u64, bool) {
+// ================================================================================
+// VIEW FUNCTIONS
+// ================================================================================
+
+/// Get survey details (MODIFIED to include subscription_service_id)
+public fun get_survey_info(survey: &Survey): (String, String, u64, u64, u64, bool, Option<ID>) {
     (
         survey.title,
         survey.description,
         survey.reward_per_response,
         survey.max_responses,
         survey.current_responses,
-        survey.is_active
+        survey.is_active,
+        survey.subscription_service_id  // Return subscription service ID
     )
+}
+
+/// Check if survey has subscription service
+public fun has_subscription_service(survey: &Survey): bool {
+    option::is_some(&survey.subscription_service_id)
+}
+
+/// Get subscription service ID if exists
+public fun get_subscription_service_id(survey: &Survey): Option<ID> {
+    survey.subscription_service_id
 }
 
 /// Get all encrypted answer blob IDs for a survey
@@ -690,7 +779,204 @@ public fun get_category_surveys(registry: &SurveyRegistry, category: String): ve
     }
 }
 
-// ======== Admin Functions ========
+/// Get survey full details including questions
+public fun get_survey_full_details(survey: &Survey): (
+    String,      // title
+    String,      // description  
+    String,      // category
+    u64,         // reward_per_response
+    u64,         // max_responses
+    u64,         // current_responses
+    bool,        // is_active
+    u64,         // created_at
+    vector<Question> // questions
+) {
+    (
+        survey.title,
+        survey.description,
+        survey.category,
+        survey.reward_per_response,
+        survey.max_responses,
+        survey.current_responses,
+        survey.is_active,
+        survey.created_at,
+        survey.questions
+    )
+}
+
+/// Get registry statistics
+public fun get_registry_stats(registry: &SurveyRegistry): (u64, u64, u64) {
+    (
+        registry.total_surveys,
+        registry.total_responses,
+        registry.total_rewards_distributed
+    )
+}
+
+/// Check if user can answer survey
+public fun can_user_answer(
+    survey: &Survey,
+    user: address
+): bool {
+    survey.is_active && 
+    survey.current_responses < survey.max_responses &&
+    !table::contains(&survey.respondents, user)
+}
+
+/// Get survey reward details
+public fun get_survey_rewards(survey: &Survey): (
+    u64,  // reward_per_response
+    u64,  // total_reward_pool (max_responses * reward_per_response)
+    u64,  // distributed_rewards (current_responses * reward_per_response)
+    u64   // remaining_rewards
+) {
+    let total_pool = survey.max_responses * survey.reward_per_response;
+    let distributed = survey.current_responses * survey.reward_per_response;
+    let remaining = total_pool - distributed;
+    
+    (
+        survey.reward_per_response,
+        total_pool,
+        distributed,
+        remaining
+    )
+}
+
+/// Get survey timestamps
+public fun get_survey_timestamps(survey: &Survey): (u64, u64) {
+    (survey.created_at, survey.updated_at)
+}
+
+/// Get survey creator
+public fun get_survey_creator(survey: &Survey): address {
+    survey.creator
+}
+
+/// Check if survey accepts new responses
+public fun is_survey_accepting_responses(survey: &Survey): bool {
+    survey.is_active && survey.current_responses < survey.max_responses
+}
+
+/// Get survey completion percentage (returns basis points, e.g., 5000 = 50%)
+public fun get_survey_completion_rate(survey: &Survey): u64 {
+    if (survey.max_responses == 0) {
+        return 0
+    };
+    (survey.current_responses * 10000) / survey.max_responses
+}
+
+/// Get consent statistics
+public fun get_consent_stats(survey: &Survey): (u64, u64) {
+    // (consenting_users_count, consent_percentage in basis points)
+    let consent_rate = if (survey.current_responses > 0) {
+        (survey.consenting_users_count * 10000) / survey.current_responses
+    } else {
+        0
+    };
+    
+    (survey.consenting_users_count, consent_rate)
+}
+
+/// Get survey allowlist info
+public fun get_allowlist_info(survey: &Survey): (u64, bool, address) {
+    // (allowlist_size, creator_in_allowlist, creator_address)
+    let size = vec_set::length(&survey.allowlist);
+    let creator_in_list = vec_set::contains(&survey.allowlist, &survey.creator);
+    
+    (size, creator_in_list, survey.creator)
+}
+
+/// Get subscription service info
+public fun get_subscription_info(service: &SubscriptionService): (
+    ID,     // survey_id
+    u64,    // price
+    u64,    // duration_ms
+    u64,    // total_revenue
+    address // creator
+) {
+    (
+        service.survey_id,
+        service.price,
+        service.duration_ms,
+        service.total_revenue,
+        service.creator
+    )
+}
+
+/// Check if subscription is valid
+public fun is_subscription_valid(
+    subscription: &Subscription,
+    clock: &Clock
+): bool {
+    clock::timestamp_ms(clock) < subscription.expires_at
+}
+
+/// Get subscription details
+public fun get_subscription_details(subscription: &Subscription): (
+    ID,      // service_id
+    ID,      // survey_id
+    address, // subscriber
+    u64,     // created_at
+    u64,     // expires_at
+    bool     // is_expired (needs clock in actual implementation)
+) {
+    (
+        subscription.service_id,
+        subscription.survey_id,
+        subscription.subscriber,
+        subscription.created_at,
+        subscription.expires_at,
+        false // Would need clock to determine
+    )
+}
+
+/// Get platform treasury info
+public fun get_treasury_info(treasury: &PlatformTreasury): (u64, u64) {
+    // (total_fees_collected, platform_fee_rate)
+    (treasury.total_fees, treasury.platform_fee_rate)
+}
+
+/// Calculate platform fee for a given amount
+public fun calculate_platform_fee(
+    treasury: &PlatformTreasury,
+    amount: u64
+): u64 {
+    (amount * treasury.platform_fee_rate) / 10000
+}
+
+/// Check if survey is in active registry
+public fun is_survey_active_in_registry(
+    registry: &SurveyRegistry,
+    survey_id: ID
+): bool {
+    table::contains(&registry.active_surveys, survey_id)
+}
+
+/// Get question details
+public fun get_question_details(question: &Question): (String, u8, vector<String>) {
+    (question.question_text, question.question_type, question.options)
+}
+
+/// Get encrypted answer blob details
+public fun get_answer_blob_details(blob: &EncryptedAnswerBlob): (
+    address,  // respondent
+    String,   // blob_id
+    String,   // seal_key_id
+    u64,      // submitted_at
+    bool      // consent_for_subscription
+) {
+    (
+        blob.respondent,
+        blob.blob_id,
+        blob.seal_key_id,
+        blob.submitted_at,
+        blob.consent_for_subscription
+    )
+}
+
+// ================================================================================
+// ADMIN FUNCTIONS
+// ================================================================================
 
 /// Withdraw platform fees (admin only)
 public fun withdraw_fees(
@@ -731,13 +1017,18 @@ public fun update_fee_rate(
     treasury.platform_fee_rate = new_rate;
 }
 
-// ======== Entry Functions ========
+// ================================================================================
+// ENTRY FUNCTIONS
+// ================================================================================
 
-/// Entry function to create survey
-entry fun create_survey_entry(
+/// Enhanced entry function to create survey with questions
+entry fun create_survey_with_questions_entry(
     title: vector<u8>,
     description: vector<u8>,
     category: vector<u8>,
+    question_texts: vector<vector<u8>>,
+    question_types: vector<u8>,
+    question_options: vector<vector<vector<u8>>>,
     reward_per_response: u64,
     max_responses: u64,
     payment: Coin<SUI>,
@@ -745,11 +1036,44 @@ entry fun create_survey_entry(
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
+    // Build questions
+    let mut questions = vector::empty<Question>();
+    let mut i = 0;
+    
+    while (i < vector::length(&question_texts)) {
+        let text = utf8(*vector::borrow(&question_texts, i));
+        let q_type = *vector::borrow(&question_types, i);
+        
+        // Convert options for this question
+        let options_raw = if (i < vector::length(&question_options)) {
+            vector::borrow(&question_options, i)
+        } else {
+            &vector::empty<vector<u8>>()
+        };
+        
+        let mut options = vector::empty<String>();
+        let mut j = 0;
+        while (j < vector::length(options_raw)) {
+            let option = utf8(*vector::borrow(options_raw, j));
+            vector::push_back(&mut options, option);
+            j = j + 1;
+        };
+        
+        let question = Question {
+            question_text: text,
+            question_type: q_type,
+            options,
+        };
+        
+        vector::push_back(&mut questions, question);
+        i = i + 1;
+    };
+    
     let cap = create_survey(
         utf8(title),
         utf8(description),
         utf8(category),
-        vector::empty(), // Questions will be added separately
+        questions,
         reward_per_response,
         max_responses,
         payment,
@@ -757,7 +1081,47 @@ entry fun create_survey_entry(
         clock,
         ctx
     );
+    
     transfer::transfer(cap, ctx.sender());
+}
+
+/// Entry function to add questions
+entry fun add_questions_entry(
+    survey: &mut Survey,
+    cap: &SurveyCap,
+    question_texts: vector<vector<u8>>,
+    question_types: vector<u8>,
+    question_options: vector<vector<vector<u8>>>, // Nested vector for options
+    clock: &Clock,
+) {
+    let mut questions = vector::empty<Question>();
+    let mut i = 0;
+    
+    while (i < vector::length(&question_texts)) {
+        let text = utf8(*vector::borrow(&question_texts, i));
+        let q_type = *vector::borrow(&question_types, i);
+        
+        // Convert options
+        let options_raw = vector::borrow(&question_options, i);
+        let mut options = vector::empty<String>();
+        let mut j = 0;
+        while (j < vector::length(options_raw)) {
+            let option = utf8(*vector::borrow(options_raw, j));
+            vector::push_back(&mut options, option);
+            j = j + 1;
+        };
+        
+        let question = Question {
+            question_text: text,
+            question_type: q_type,
+            options,
+        };
+        
+        vector::push_back(&mut questions, question);
+        i = i + 1;
+    };
+    
+    add_questions(survey, cap, questions, clock);
 }
 
 /// Entry function to submit answer with blob ID
@@ -783,9 +1147,9 @@ entry fun submit_answer_entry(
     );
 }
 
-/// Entry function to create subscription service
+/// Entry function to create subscription service (MODIFIED)
 entry fun create_subscription_service_entry(
-    survey: &Survey,
+    survey: &mut Survey,  // Changed to mutable reference
     cap: &SurveyCap,
     price: u64,
     duration_ms: u64,
@@ -812,4 +1176,18 @@ entry fun purchase_subscription_entry(
         ctx
     );
     transfer::transfer(subscription, ctx.sender());
+}
+
+/// Entry function to check if user answered (returns via event)
+entry fun check_if_answered_entry(
+    survey: &Survey,
+    user: address
+) {
+    let answered = table::contains(&survey.respondents, user);
+    // In real implementation, emit an event with the result
+    event::emit(UserAnsweredCheck {
+        survey_id: object::id(survey),
+        user,
+        has_answered: answered
+    });
 }

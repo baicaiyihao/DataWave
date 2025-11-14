@@ -212,7 +212,7 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
       const stored = await get('sessionKey');
       if (stored) {
         try {
-          const imported = await SessionKey.import(stored, suiClient);
+          const imported = await SessionKey.import(stored as any, suiClient);
           if (!imported.isExpired() && imported.getAddress() === currentAccount.address) {
             setSessionKey(imported);
             showToast('success', 'Session key loaded');
@@ -300,7 +300,7 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
       const ids = batch.map((item) => EncryptedObject.parse(new Uint8Array(item.data)).id);
       const tx = new Transaction();
       ids.forEach((id) => moveCallConstructor(tx, id));
-      const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
+      const txBytes = await tx.build({ client: suiClient as any, onlyTransactionKind: true });
       
       try {
         await sealClient.fetchKeys({ ids, txBytes, sessionKey, threshold: 2 });
@@ -318,7 +318,7 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
       const fullId = EncryptedObject.parse(new Uint8Array(data)).id;
       const tx = new Transaction();
       moveCallConstructor(tx, fullId);
-      const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
+      const txBytes = await tx.build({ client: suiClient as any, onlyTransactionKind: true });
       
       try {
         const decryptedFile = await sealClient.decrypt({
@@ -422,7 +422,7 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
       try {
         const stored = await get('sessionKey');
         if (stored) {
-          const imported = await SessionKey.import(stored, suiClient);
+          const imported = await SessionKey.import(stored as any, suiClient);
           if (!imported.isExpired() && imported.getAddress() === currentAccount.address) {
             setSessionKey(imported);
             showToast('info', 'Session key loaded automatically');

@@ -282,7 +282,7 @@ export function SurveyManagementPage() {
             
             const currentTime = Date.now();
             for (const event of subscriptionEvents.data) {
-              if (event.parsedJson?.survey_id === surveyId) {
+              if (event.parsedJson?.survey_id  === surveyId ) {
                 const eventData = event.parsedJson;
                 
                 subscribers.push({
@@ -341,7 +341,7 @@ export function SurveyManagementPage() {
     });
     
     signAndExecute(
-      { transaction: tx },
+      { transaction: tx as any},
       {
         onSuccess: async (result) => {
           showToast('success', 'Subscription service created successfully!');
@@ -392,7 +392,7 @@ export function SurveyManagementPage() {
     });
     
     signAndExecute(
-      { transaction: tx },
+      { transaction: tx as any},
       {
         onSuccess: () => {
           showToast('success', 'Address added to allowlist');

@@ -332,7 +332,7 @@ export function BrowseSubscriptions() {
     });
     
     signAndExecute(
-      { transaction: tx },
+      { transaction: tx as any},
       {
         onSuccess: (result) => {
           console.log('Subscription purchased:', result);

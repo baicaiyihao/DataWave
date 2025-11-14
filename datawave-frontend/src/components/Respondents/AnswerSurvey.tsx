@@ -397,7 +397,7 @@ export function AnswerSurvey() {
       tx.setGasBudget(1000000000);
       
       signAndExecute(
-        { transaction: tx },
+        { transaction: tx as any},
         {
           onSuccess: (result) => {
             setUploadProgress({

@@ -211,8 +211,9 @@ export function MySurveys() {
         });
 
         if (registry.data?.content && 'fields' in registry.data.content) {
-          const fields = registry.data.content.fields;
-          const surveysByCreatorTable = fields.surveys_by_creator?.fields?.id?.id;
+          // 使用类型断言处理Move结构体
+          const fields = registry.data.content.fields as any;
+          const surveysByCreatorTable = fields?.surveys_by_creator?.fields?.id?.id;
           
           if (surveysByCreatorTable) {
             try {
@@ -225,7 +226,9 @@ export function MySurveys() {
               });
               
               if (creatorField.data?.content && 'fields' in creatorField.data.content) {
-                const surveyIds = creatorField.data.content.fields.value || [];
+                // 使用类型断言处理creatorField的fields
+                const creatorFieldData = creatorField.data.content.fields as any;
+                const surveyIds = creatorFieldData.value || [];
                 
                 for (const surveyId of surveyIds) {
                   if (!surveyIdSet.has(surveyId)) {
@@ -699,7 +702,7 @@ export function MySurveys() {
         )}
       </div>
 
-      {/* Toast Notifications
+      {/* Toast Notifications */}
       <div className="mys-toast-container">
         {toasts.map(toast => (
           <div key={toast.id} className={`mys-toast ${toast.type}`}>
@@ -710,7 +713,7 @@ export function MySurveys() {
             <span>{toast.message}</span>
           </div>
         ))}
-      </div> */}
+      </div>
     </div>
   );
 }

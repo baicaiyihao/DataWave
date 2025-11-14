@@ -1,0 +1,882 @@
+/* MySurveys.css - Card Layout Version */
+
+/* ========================================
+   Container & Base Layout
+   ======================================== */
+.mys-container {
+  width: 100%;
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: #ffffff;
+  padding: 20px;
+}
+
+/* ========================================
+   Connect Wallet State
+   ======================================== */
+.mys-connect-wallet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.8), rgba(20, 20, 35, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 48px;
+  backdrop-filter: blur(20px);
+}
+
+.mys-connect-wallet svg {
+  color: #a78bfa;
+}
+
+.mys-connect-wallet h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.mys-connect-wallet p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin: 0;
+  max-width: 400px;
+}
+
+/* ========================================
+   Header Section
+   ======================================== */
+.mys-header {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.8), rgba(20, 20, 35, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.mys-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.mys-header-info {
+  flex: 1;
+}
+
+.mys-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+}
+
+.mys-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.mys-header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ========================================
+   Stats Grid
+   ======================================== */
+.mys-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.mys-stat-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.mys-stat-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+}
+
+.mys-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mys-stat-icon.blue {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.mys-stat-icon.green {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.mys-stat-icon.purple {
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  color: #a78bfa;
+}
+
+.mys-stat-icon.cyan {
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  color: #06b6d4;
+}
+
+.mys-stat-content {
+  flex: 1;
+}
+
+.mys-stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 4px;
+}
+
+.mys-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+.mys-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.mys-btn.primary {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  color: white;
+}
+
+.mys-btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+}
+
+.mys-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.mys-btn.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.mys-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mys-spinning {
+  animation: mys-spin 1s linear infinite;
+}
+
+@keyframes mys-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Tabs Section
+   ======================================== */
+.mys-tabs-section {
+  background: rgba(30, 30, 45, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.mys-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mys-tab {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  position: relative;
+}
+
+.mys-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.mys-tab.active {
+  color: #a78bfa;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.mys-tab-count {
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.mys-tab.active .mys-tab-count {
+  background: rgba(124, 58, 237, 0.2);
+}
+
+/* ========================================
+   Surveys Section - Card Grid Layout
+   ======================================== */
+.mys-surveys-section {
+  min-height: 400px;
+}
+
+.mys-surveys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+/* Survey Card */
+.mys-survey-card {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.6), rgba(20, 20, 35, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mys-survey-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.2);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.mys-survey-card.completed {
+  opacity: 0.8;
+}
+
+.mys-survey-card.completed::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+/* Card Header */
+.mys-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mys-category-badge {
+  padding: 4px 10px;
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #a78bfa;
+  font-weight: 500;
+}
+
+.mys-header-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.mys-status-badge {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.mys-status-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.mys-status-badge.completed {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #3b82f6;
+}
+
+.mys-status-badge.closed {
+  background: rgba(107, 114, 128, 0.15);
+  border: 1px solid rgba(107, 114, 128, 0.3);
+  color: #9ca3af;
+}
+
+.mys-subscription-badge {
+  width: 24px;
+  height: 24px;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a78bfa;
+}
+
+.mys-no-cap-badge {
+  width: 24px;
+  height: 24px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f59e0b;
+}
+
+/* Card Content */
+.mys-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.mys-card-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card Info */
+.mys-card-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.mys-info-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.mys-info-item svg {
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+/* Response Progress */
+.mys-response-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.mys-response-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mys-response-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mys-response-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.mys-progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.mys-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.mys-progress-percent {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: right;
+}
+
+/* Subscription Info */
+.mys-subscription-info {
+  background: rgba(168, 85, 247, 0.05);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.mys-subscription-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #a78bfa;
+  margin-bottom: 8px;
+}
+
+.mys-subscription-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mys-subscription-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mys-subscription-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mys-subscription-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* Card Actions */
+.mys-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.mys-action-btn {
+  flex: 1;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.mys-action-btn.primary {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  color: white;
+}
+
+.mys-action-btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.mys-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.mys-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.mys-action-btn.icon {
+  flex: none;
+  width: 36px;
+  padding: 8px;
+}
+
+/* ========================================
+   Skeleton Loading
+   ======================================== */
+.mys-skeleton-card {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.6), rgba(20, 20, 35, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mys-skeleton-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mys-skeleton-badge,
+.mys-skeleton-badges,
+.mys-skeleton-title,
+.mys-skeleton-description,
+.mys-skeleton-stat,
+.mys-skeleton-progress,
+.mys-skeleton-button {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.05) 25%, 
+    rgba(255, 255, 255, 0.1) 50%, 
+    rgba(255, 255, 255, 0.05) 75%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: mys-skeleton-loading 1.5s infinite;
+}
+
+.mys-skeleton-badge {
+  width: 80px;
+  height: 24px;
+}
+
+.mys-skeleton-badges {
+  width: 60px;
+  height: 24px;
+}
+
+.mys-skeleton-title {
+  width: 70%;
+  height: 20px;
+}
+
+.mys-skeleton-description {
+  width: 100%;
+  height: 32px;
+}
+
+.mys-skeleton-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.mys-skeleton-stat {
+  width: 80px;
+  height: 16px;
+}
+
+.mys-skeleton-progress {
+  height: 50px;
+}
+
+.mys-skeleton-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mys-skeleton-button {
+  flex: 1;
+  height: 36px;
+}
+
+@keyframes mys-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ========================================
+   Empty State
+   ======================================== */
+.mys-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+  background: rgba(30, 30, 45, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 48px;
+}
+
+.mys-empty-state svg {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.mys-empty-state h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  text-align: center;
+}
+
+.mys-empty-state p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin: 0;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* ========================================
+   Toast Notifications
+   ======================================== */
+.mys-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.mys-toast {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px 20px;
+  max-width: 360px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: mys-slide-in 0.3s ease-out;
+  pointer-events: auto;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+@keyframes mys-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.mys-toast.success {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.mys-toast.success > svg {
+  color: #10b981;
+}
+
+.mys-toast.error {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.mys-toast.error > svg {
+  color: #ef4444;
+}
+
+.mys-toast.warning {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.mys-toast.warning > svg {
+  color: #f59e0b;
+}
+
+.mys-toast.info {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.mys-toast.info > svg {
+  color: #3b82f6;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+@media (max-width: 1024px) {
+  .mys-surveys-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .mys-container {
+    padding: 12px;
+  }
+  
+  .mys-header {
+    padding: 16px;
+  }
+  
+  .mys-header-content {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .mys-header-actions {
+    width: 100%;
+  }
+  
+  .mys-header-actions .mys-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .mys-title {
+    font-size: 20px;
+  }
+  
+  .mys-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .mys-tabs-section {
+    padding: 16px;
+  }
+  
+  .mys-surveys-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .mys-toast-container {
+    right: 10px;
+    left: 10px;
+  }
+  
+  .mys-toast {
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .mys-header {
+    border-radius: 12px;
+  }
+  
+  .mys-title {
+    font-size: 18px;
+  }
+  
+  .mys-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .mys-tabs {
+    flex-direction: column;
+  }
+  
+  .mys-tab {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .mys-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .mys-card-info {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .mys-subscription-stats {
+    grid-template-columns: 1fr;
+  }
+}

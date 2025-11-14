@@ -1,0 +1,980 @@
+/* MyAllowlistAccess.css */
+
+/* ========================================
+   Container & Base Layout
+   ======================================== */
+.mal-container {
+  width: 100%;
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: #ffffff;
+  padding: 20px;
+}
+
+/* ========================================
+   Connect Wallet State
+   ======================================== */
+.mal-connect-wallet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.8), rgba(20, 20, 35, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 48px;
+  backdrop-filter: blur(20px);
+}
+
+.mal-connect-wallet svg {
+  color: #a78bfa;
+}
+
+.mal-connect-wallet h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.mal-connect-wallet p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin: 0;
+  max-width: 400px;
+}
+
+/* ========================================
+   Header Section
+   ======================================== */
+.mal-header {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.8), rgba(20, 20, 35, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.mal-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.mal-header-info {
+  flex: 1;
+}
+
+.mal-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+}
+
+.mal-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ========================================
+   Stats Grid
+   ======================================== */
+.mal-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.mal-stat-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.mal-stat-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+}
+
+.mal-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mal-stat-icon.purple {
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  color: #a78bfa;
+}
+
+.mal-stat-icon.green {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.mal-stat-icon.blue {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.mal-stat-icon.orange {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.mal-stat-content {
+  flex: 1;
+}
+
+.mal-stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 4px;
+}
+
+.mal-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.mal-stat-value.success {
+  color: #10b981;
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+.mal-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.mal-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.mal-btn.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.mal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mal-spinning {
+  animation: mal-spin 1s linear infinite;
+}
+
+@keyframes mal-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Filters Section
+   ======================================== */
+.mal-filters-section {
+  background: rgba(30, 30, 45, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+/* Tabs */
+.mal-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 16px;
+}
+
+.mal-tab {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  position: relative;
+}
+
+.mal-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.mal-tab.active {
+  color: #a78bfa;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.mal-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -17px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+}
+
+.mal-tab-count {
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.mal-tab.active .mal-tab-count {
+  background: rgba(124, 58, 237, 0.2);
+}
+
+/* Filter Controls */
+.mal-filter-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.mal-search-box {
+  flex: 1;
+  max-width: 400px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.mal-search-box svg {
+  position: absolute;
+  left: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+.mal-search-input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.mal-search-input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(124, 58, 237, 0.5);
+}
+
+.mal-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.mal-filter-select {
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.mal-filter-select:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.mal-filter-select option {
+  background: #1a1a2e;
+  color: #ffffff;
+}
+
+/* ========================================
+   Surveys Section - Card Grid
+   ======================================== */
+.mal-surveys-section {
+  min-height: 400px;
+}
+
+.mal-surveys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+/* Survey Card */
+.mal-survey-card {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.6), rgba(20, 20, 35, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mal-survey-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.mal-survey-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.2);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.mal-survey-card:hover::before {
+  opacity: 1;
+}
+
+/* Card Header */
+.mal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mal-category-badge {
+  padding: 4px 10px;
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #a78bfa;
+  font-weight: 500;
+}
+
+.mal-header-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.mal-status-badge {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.mal-status-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.mal-status-badge.inactive {
+  background: rgba(107, 114, 128, 0.15);
+  border: 1px solid rgba(107, 114, 128, 0.3);
+  color: #9ca3af;
+}
+
+.mal-answers-badge {
+  padding: 3px 8px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Card Content */
+.mal-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.mal-card-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card Info */
+.mal-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.mal-info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.mal-info-item svg {
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.mal-info-label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mal-info-value {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+/* Progress Section */
+.mal-progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mal-progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mal-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.mal-progress-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: right;
+}
+
+/* Access Badge */
+.mal-access-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #a78bfa;
+}
+
+.mal-access-badge svg {
+  color: #a78bfa;
+}
+
+/* Card Actions */
+.mal-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.mal-action-btn {
+  flex: 1;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.mal-action-btn.primary {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  color: white;
+}
+
+.mal-action-btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.mal-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.mal-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ========================================
+   Skeleton Loading
+   ======================================== */
+.mal-skeleton-card {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.6), rgba(20, 20, 35, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mal-skeleton-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mal-skeleton-badge,
+.mal-skeleton-badges,
+.mal-skeleton-title,
+.mal-skeleton-description,
+.mal-skeleton-info-item,
+.mal-skeleton-access,
+.mal-skeleton-button {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.05) 25%, 
+    rgba(255, 255, 255, 0.1) 50%, 
+    rgba(255, 255, 255, 0.05) 75%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: mal-skeleton-loading 1.5s infinite;
+}
+
+.mal-skeleton-badge {
+  width: 80px;
+  height: 24px;
+}
+
+.mal-skeleton-badges {
+  width: 60px;
+  height: 24px;
+}
+
+.mal-skeleton-title {
+  width: 70%;
+  height: 20px;
+}
+
+.mal-skeleton-description {
+  width: 100%;
+  height: 32px;
+}
+
+.mal-skeleton-info {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mal-skeleton-info-item {
+  height: 16px;
+}
+
+.mal-skeleton-access {
+  height: 40px;
+}
+
+.mal-skeleton-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mal-skeleton-button {
+  flex: 1;
+  height: 36px;
+}
+
+@keyframes mal-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ========================================
+   Empty State
+   ======================================== */
+.mal-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+  background: rgba(30, 30, 45, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 48px;
+}
+
+.mal-empty-state svg {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.mal-empty-state h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  text-align: center;
+}
+
+.mal-empty-state p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin: 0;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* ========================================
+   Pagination
+   ======================================== */
+.mal-pagination {
+  background: rgba(30, 30, 45, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+}
+
+.mal-pagination-info {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mal-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mal-pagination-btn {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mal-pagination-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.mal-pagination-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.mal-pagination-numbers {
+  display: flex;
+  gap: 4px;
+}
+
+.mal-pagination-number {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mal-pagination-number:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.mal-pagination-number.active {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  border-color: transparent;
+  color: white;
+}
+
+/* ========================================
+   Toast Notifications
+   ======================================== */
+.mal-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.mal-toast {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px 20px;
+  max-width: 360px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: mal-slide-in 0.3s ease-out;
+  pointer-events: auto;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+@keyframes mal-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.mal-toast.success {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.mal-toast.success > svg {
+  color: #10b981;
+}
+
+.mal-toast.error {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.mal-toast.error > svg {
+  color: #ef4444;
+}
+
+.mal-toast.warning {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.mal-toast.warning > svg {
+  color: #f59e0b;
+}
+
+.mal-toast.info {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.mal-toast.info > svg {
+  color: #3b82f6;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+@media (max-width: 1024px) {
+  .mal-surveys-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .mal-container {
+    padding: 12px;
+  }
+  
+  .mal-header {
+    padding: 16px;
+  }
+  
+  .mal-header-content {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .mal-title {
+    font-size: 20px;
+  }
+  
+  .mal-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .mal-filters-section {
+    padding: 16px;
+  }
+  
+  .mal-filter-controls {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .mal-search-box {
+    max-width: none;
+  }
+  
+  .mal-surveys-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .mal-pagination {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .mal-pagination-controls {
+    justify-content: center;
+  }
+  
+  .mal-toast-container {
+    right: 10px;
+    left: 10px;
+  }
+  
+  .mal-toast {
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .mal-header {
+    border-radius: 12px;
+  }
+  
+  .mal-title {
+    font-size: 18px;
+  }
+  
+  .mal-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .mal-tabs {
+    flex-direction: column;
+  }
+  
+  .mal-tab {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .mal-tab.active::after {
+    display: none;
+  }
+  
+  .mal-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .mal-card-info {
+    gap: 8px;
+  }
+}

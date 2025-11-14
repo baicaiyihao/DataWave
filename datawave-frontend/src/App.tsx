@@ -1,4 +1,4 @@
-// App.tsx - 集成首页的完整路由版本
+// App.tsx - 修复钱包持久化的版本
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit';
@@ -12,12 +12,11 @@ import HomePage from './pages/HomePage';
 // Layout
 import AppLayout from './components/Layout/AppLayout';
 
-// Dashboard
-import Dashboard from './components/Dashboard/Dashboard';
+
 
 // Respondents Components
 import ViewAllSurveys from './components/Respondents/ViewAllSurveys';
-import AnswerSurveyWithSeal from './components/Respondents/AnswerSurveyWithSeal';
+import AnswerSurvey from './components/Respondents/AnswerSurvey';
 import MyAnsweredSurveys from './components/Respondents/MyAnsweredSurveys';
 
 // Enterprises Components  
@@ -35,28 +34,32 @@ import SubscriptionDecrypt from './components/Marketplace/SubscriptionDecrypt';
 import MyAllowlistAccess from './components/Shared/MyAllowlistAccess';
 import ViewSurveyDetails from './components/Shared/ViewSurveyDetails';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 60 * 1000, // 1 minute
+    },
+  },
+});
+
 
 function App() {
-  const networks = {
-    testnet: { url: getFullnodeUrl('testnet') },
-  };
-
   return (
     <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networks} defaultNetwork="testnet">
-        <WalletProvider>
+      <SuiClientProvider networks={{ testnet: { url: getFullnodeUrl('testnet') } }} defaultNetwork="testnet">
+        <WalletProvider 
+          autoConnect={true}
+        >
           <Router>
             <Routes>
-              {/* Landing Page - 不需要 Layout */}
               <Route path="/" element={<HomePage />} />
               
-              {/* App Routes - 需要 Layout */}
               <Route path="/app" element={<AppLayout />}>
                 
                 {/* Respondent Routes */}
                 <Route path="marketplace" element={<ViewAllSurveys />} />
-                <Route path="answer/:surveyId" element={<AnswerSurveyWithSeal />} />
+                <Route path="answer/:surveyId" element={<AnswerSurvey />} />
                 <Route path="my-responses" element={<MyAnsweredSurveys />} />
                 <Route path="earnings" element={<MyAnsweredSurveys />} />
                 

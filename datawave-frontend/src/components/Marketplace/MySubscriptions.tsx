@@ -1,8 +1,5 @@
-// My Subscriptions Page - Router Version
-// 管理用户的订阅，查看活跃和过期的订阅
-
+// src/components/Subscription/MySubscriptions.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, Flex, Text, Badge, Button, Grid, Tabs } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
@@ -17,8 +14,17 @@ import {
   AlertCircle,
   FileText,
   Users,
-  TrendingUp
+  TrendingUp,
+  Wallet,
+  DollarSign,
+  Shield,
+  X,
+  Hash,
+  ChevronRight,
+  Package,
+  ShoppingCart
 } from 'lucide-react';
+import './MySubscriptions.css';
 
 interface UserSubscription {
   subscriptionId: string;
@@ -44,7 +50,10 @@ export function MySubscriptions() {
   
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'expired'>('active');
+  const [selectedSubscription, setSelectedSubscription] = useState<UserSubscription | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   
   const [stats, setStats] = useState({
     totalSubscriptions: 0,
@@ -53,16 +62,34 @@ export function MySubscriptions() {
     totalSpent: 0,
   });
 
-  // Navigation functions
+  // Toast notifications
+  const [toasts, setToasts] = useState<Array<{
+    id: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    message: string;
+  }>>([]);
+
+  const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 3000);
+  };
+
+  // Navigation functions - Updated routes
   const viewSurveyAnswers = (surveyId: string, subscriptionId: string) => {
-    // Navigate to subscription decrypt page with subscription info
-    navigate(`/subscription/decrypt/${surveyId}`, { 
+    navigate(`/app/subscription-decrypt/${surveyId}`, { 
       state: { subscriptionId } 
     });
   };
 
   const browseMoreSubscriptions = () => {
-    navigate('/marketplace/subscriptions');
+    navigate('/app/subscriptions');
+  };
+
+  const viewSurveyDetails = (surveyId: string) => {
+    navigate(`/app/survey/${surveyId}`);
   };
 
   const loadUserSubscriptions = async () => {
@@ -166,11 +193,27 @@ export function MySubscriptions() {
         expiredSubscriptions: expiredCount,
         totalSpent,
       });
+      
+      if (!loading) {
+        showToast('success', `Loaded ${subscriptionData.length} subscriptions`);
+      }
     } catch (error) {
       console.error('Error loading subscriptions:', error);
+      showToast('error', 'Failed to load subscriptions');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadUserSubscriptions();
+  };
+
+  const viewDetails = (subscription: UserSubscription) => {
+    setSelectedSubscription(subscription);
+    setShowDetailsModal(true);
   };
 
   useEffect(() => {
@@ -217,246 +260,444 @@ export function MySubscriptions() {
     }
   };
 
+  // Skeleton loader component
+  const SkeletonCard = () => (
+    <div className="ms-skeleton-card">
+      <div className="ms-skeleton-header">
+        <div className="ms-skeleton-badge"></div>
+        <div className="ms-skeleton-status"></div>
+      </div>
+      <div className="ms-skeleton-title"></div>
+      <div className="ms-skeleton-description"></div>
+      <div className="ms-skeleton-details">
+        <div className="ms-skeleton-detail"></div>
+        <div className="ms-skeleton-detail"></div>
+        <div className="ms-skeleton-detail"></div>
+      </div>
+      <div className="ms-skeleton-timer"></div>
+      <div className="ms-skeleton-actions">
+        <div className="ms-skeleton-button"></div>
+        <div className="ms-skeleton-button small"></div>
+      </div>
+    </div>
+  );
+
   if (!currentAccount) {
     return (
-      <Card>
-        <Flex direction="column" align="center" gap="3" py="5">
-          <Text size="4" weight="bold">Connect Wallet</Text>
-          <Text size="2" color="gray">Please connect your wallet to view your subscriptions</Text>
-        </Flex>
-      </Card>
+      <div className="ms-container">
+        <div className="ms-connect-wallet">
+          <Wallet size={48} />
+          <h2>Connect Your Wallet</h2>
+          <p>Please connect your wallet to view your subscriptions</p>
+        </div>
+      </div>
     );
   }
 
   const activeSubscriptions = subscriptions.filter(s => !s.isExpired);
   const expiredSubscriptions = subscriptions.filter(s => s.isExpired);
+  const displaySubscriptions = activeTab === 'active' ? activeSubscriptions : expiredSubscriptions;
 
   return (
-    <Flex direction="column" gap="3">
+    <div className="ms-container">
       {/* Header with Stats */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="center">
-            <div>
-              <Text size="5" weight="bold">My Survey Subscriptions</Text>
-              <Text size="2" color="gray">Manage your active and expired subscriptions</Text>
+      <div className="ms-header">
+        <div className="ms-header-content">
+          <div className="ms-header-info">
+            <h1 className="ms-title">My Survey Subscriptions</h1>
+            <p className="ms-subtitle">Manage your active and expired subscriptions</p>
+          </div>
+          <div className="ms-header-actions">
+            <button 
+              className="ms-btn secondary"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw size={16} className={refreshing ? 'ms-spinning' : ''} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button 
+              className="ms-btn primary"
+              onClick={browseMoreSubscriptions}
+            >
+              <ShoppingCart size={16} />
+              Browse More
+            </button>
+          </div>
+        </div>
+        
+        {/* Stats Cards */}
+        <div className="ms-stats-grid">
+          <div className="ms-stat-card">
+            <div className="ms-stat-icon blue">
+              <Package size={20} />
             </div>
-            <Flex gap="2">
-              <Button onClick={loadUserSubscriptions} variant="soft" disabled={loading}>
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                {loading ? 'Loading...' : 'Refresh'}
-              </Button>
-              <Button onClick={browseMoreSubscriptions} variant="soft" color="blue">
-                Browse More
-              </Button>
-            </Flex>
-          </Flex>
+            <div className="ms-stat-content">
+              <div className="ms-stat-label">Total Subscriptions</div>
+              <div className="ms-stat-value">{stats.totalSubscriptions}</div>
+            </div>
+          </div>
           
-          {/* Stats Cards */}
-          <Grid columns="4" gap="3">
-            <Card style={{ backgroundColor: 'var(--blue-2)' }}>
-              <Flex direction="column" gap="1">
-                <Text size="1" color="gray">Total Subscriptions</Text>
-                <Text size="4" weight="bold">{stats.totalSubscriptions}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ backgroundColor: 'var(--green-2)' }}>
-              <Flex direction="column" gap="1">
-                <Text size="1" color="gray">Active</Text>
-                <Text size="4" weight="bold" color="green">{stats.activeSubscriptions}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ backgroundColor: 'var(--gray-3)' }}>
-              <Flex direction="column" gap="1">
-                <Text size="1" color="gray">Expired</Text>
-                <Text size="4" weight="bold">{stats.expiredSubscriptions}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ backgroundColor: 'var(--purple-2)' }}>
-              <Flex direction="column" gap="1">
-                <Text size="1" color="gray">Total Spent</Text>
-                <Text size="3" weight="bold">{formatPrice(stats.totalSpent)}</Text>
-              </Flex>
-            </Card>
-          </Grid>
-        </Flex>
-      </Card>
+          <div className="ms-stat-card">
+            <div className="ms-stat-icon green">
+              <CheckCircle size={20} />
+            </div>
+            <div className="ms-stat-content">
+              <div className="ms-stat-label">Active</div>
+              <div className="ms-stat-value success">{stats.activeSubscriptions}</div>
+            </div>
+          </div>
+          
+          <div className="ms-stat-card">
+            <div className="ms-stat-icon gray">
+              <XCircle size={20} />
+            </div>
+            <div className="ms-stat-content">
+              <div className="ms-stat-label">Expired</div>
+              <div className="ms-stat-value">{stats.expiredSubscriptions}</div>
+            </div>
+          </div>
+          
+          <div className="ms-stat-card">
+            <div className="ms-stat-icon purple">
+              <DollarSign size={20} />
+            </div>
+            <div className="ms-stat-content">
+              <div className="ms-stat-label">Total Spent</div>
+              <div className="ms-stat-value">{formatPrice(stats.totalSpent)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Tabs */}
-      <Tabs.Root value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <Tabs.List>
-          <Tabs.Trigger value="active">
+      <div className="ms-tabs-section">
+        <div className="ms-tabs">
+          <button
+            className={`ms-tab ${activeTab === 'active' ? 'active' : ''}`}
+            onClick={() => setActiveTab('active')}
+          >
+            <CheckCircle size={16} />
             Active ({activeSubscriptions.length})
-          </Tabs.Trigger>
-          <Tabs.Trigger value="expired">
+          </button>
+          <button
+            className={`ms-tab ${activeTab === 'expired' ? 'active' : ''}`}
+            onClick={() => setActiveTab('expired')}
+          >
+            <XCircle size={16} />
             Expired ({expiredSubscriptions.length})
-          </Tabs.Trigger>
-        </Tabs.List>
-        
-        {/* Active Subscriptions */}
-        <Tabs.Content value="active">
-          {loading ? (
-            <Card>
-              <Text align="center">Loading your subscriptions...</Text>
-            </Card>
-          ) : activeSubscriptions.length === 0 ? (
-            <Card>
-              <Flex direction="column" align="center" gap="3" py="4">
-                <AlertCircle size={48} color="gray" />
-                <Text size="3" weight="bold">No Active Subscriptions</Text>
-                <Text size="2" color="gray">You don't have any active subscriptions</Text>
-                <Button onClick={browseMoreSubscriptions}>
+          </button>
+        </div>
+      </div>
+
+      {/* Subscriptions Grid */}
+      <div className="ms-subscriptions-section">
+        {loading ? (
+          <div className="ms-subscriptions-grid">
+            {[...Array(4)].map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : displaySubscriptions.length === 0 ? (
+          <div className="ms-empty-state">
+            {activeTab === 'active' ? (
+              <>
+                <AlertCircle size={48} />
+                <h3>No Active Subscriptions</h3>
+                <p>You don't have any active subscriptions</p>
+                <button className="ms-btn primary" onClick={browseMoreSubscriptions}>
                   Browse Available Subscriptions
-                </Button>
-              </Flex>
-            </Card>
-          ) : (
-            <Grid columns={{ initial: '1', sm: '2' }} gap="3">
-              {activeSubscriptions.map((sub) => (
-                <Card key={sub.subscriptionId}>
-                  <Flex direction="column" gap="3">
-                    {/* Header */}
-                    <div>
-                      <Flex justify="between" align="start" mb="2">
-                        <Badge variant="soft">{sub.surveyCategory}</Badge>
-                        <Badge color="green" variant="soft">
-                          <CheckCircle size={12} />
-                          Active
-                        </Badge>
-                      </Flex>
-                      <Text size="3" weight="bold">{sub.surveyTitle}</Text>
-                      <Text size="2" color="gray" style={{ marginTop: '4px' }}>
-                        {sub.surveyDescription}
-                      </Text>
+                </button>
+              </>
+            ) : (
+              <>
+                <Package size={48} />
+                <h3>No Expired Subscriptions</h3>
+                <p>All your subscriptions are currently active</p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="ms-subscriptions-grid">
+            {displaySubscriptions.map((sub) => (
+              <div 
+                key={sub.subscriptionId} 
+                className={`ms-subscription-card ${sub.isExpired ? 'expired' : 'active'}`}
+              >
+                {/* Card Header */}
+                <div className="ms-card-header">
+                  <span className="ms-category-badge">{sub.surveyCategory}</span>
+                  <span className={`ms-status-badge ${sub.isExpired ? 'expired' : 'active'}`}>
+                    {sub.isExpired ? (
+                      <>
+                        <XCircle size={12} />
+                        Expired
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle size={12} />
+                        Active
+                      </>
+                    )}
+                  </span>
+                </div>
+                
+                {/* Card Content */}
+                <h3 className="ms-card-title">{sub.surveyTitle}</h3>
+                <p className="ms-card-description">{sub.surveyDescription}</p>
+                
+                {/* Details */}
+                <div className="ms-card-details">
+                  <div className="ms-detail-row">
+                    <span className="ms-detail-label">
+                      <Hash size={12} />
+                      ID:
+                    </span>
+                    <span className="ms-detail-value">
+                      {sub.subscriptionId.slice(0, 8)}...
+                    </span>
+                  </div>
+                  
+                  <div className="ms-detail-row">
+                    <span className="ms-detail-label">
+                      <Users size={12} />
+                      Responses:
+                    </span>
+                    <span className="ms-detail-value">
+                      {sub.responseCount} / {sub.maxResponses}
+                    </span>
+                  </div>
+                  
+                  {sub.isExpired ? (
+                    <div className="ms-detail-row">
+                      <span className="ms-detail-label">
+                        <Calendar size={12} />
+                        Expired:
+                      </span>
+                      <span className="ms-detail-value expired">
+                        {formatDate(sub.expiresAt)}
+                      </span>
                     </div>
-
-                    {/* Details */}
-                    <Flex direction="column" gap="2">
-                      <Flex justify="between">
-                        <Text size="2" color="gray">Subscription ID:</Text>
-                        <Text size="2" style={{ fontFamily: 'monospace' }}>
-                          {sub.subscriptionId.slice(0, 8)}...
-                        </Text>
-                      </Flex>
+                  ) : (
+                    <>
+                      <div className="ms-detail-row">
+                        <span className="ms-detail-label">
+                          <Calendar size={12} />
+                          Subscribed:
+                        </span>
+                        <span className="ms-detail-value">
+                          {formatDate(sub.createdAt)}
+                        </span>
+                      </div>
                       
-                      <Flex justify="between">
-                        <Text size="2" color="gray">Survey Responses:</Text>
-                        <Text size="2" weight="bold">
-                          {sub.responseCount} / {sub.maxResponses}
-                        </Text>
-                      </Flex>
-                      
-                      <Flex justify="between">
-                        <Text size="2" color="gray">Subscribed:</Text>
-                        <Text size="2">{formatDate(sub.createdAt)}</Text>
-                      </Flex>
-                      
-                      <Flex justify="between">
-                        <Text size="2" color="gray">Expires:</Text>
-                        <Text size="2">{formatDate(sub.expiresAt)}</Text>
-                      </Flex>
-                    </Flex>
+                      <div className="ms-detail-row">
+                        <span className="ms-detail-label">
+                          <Clock size={12} />
+                          Expires:
+                        </span>
+                        <span className="ms-detail-value">
+                          {formatDate(sub.expiresAt)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
 
-                    {/* Time Remaining */}
-                    <Card style={{ backgroundColor: 'var(--green-2)' }}>
-                      <Flex align="center" justify="center" gap="2">
-                        <Clock size={16} />
-                        <Text size="2" weight="bold">
-                          {getTimeRemaining(sub.expiresAt)}
-                        </Text>
-                      </Flex>
-                    </Card>
+                {/* Time Remaining or Expired Info */}
+                {sub.isExpired ? (
+                  <div className="ms-expired-info">
+                    <div className="ms-expired-details">
+                      <span>Duration: {formatDuration(sub.duration)}</span>
+                      <span>•</span>
+                      <span>Price: {formatPrice(sub.price)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="ms-time-remaining">
+                    <Clock size={16} />
+                    <span>{getTimeRemaining(sub.expiresAt)}</span>
+                  </div>
+                )}
 
-                    {/* Actions */}
-                    <Flex gap="2">
-                      <Button
-                        size="2"
-                        style={{ flex: 1 }}
+                {/* Actions */}
+                <div className="ms-card-actions">
+                  {sub.isExpired ? (
+                    <>
+                      <button
+                        className="ms-btn secondary full"
+                        onClick={browseMoreSubscriptions}
+                      >
+                        <RefreshCw size={16} />
+                        Renew Subscription
+                      </button>
+                      <button
+                        className="ms-icon-btn"
+                        onClick={() => viewDetails(sub)}
+                        title="View details"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="ms-btn primary"
                         onClick={() => viewSurveyAnswers(sub.surveyId, sub.subscriptionId)}
                       >
                         <Eye size={16} />
-                        View Survey Answers
-                      </Button>
-                      <Button
-                        size="2"
-                        variant="soft"
+                        View Answers
+                      </button>
+                      <button
+                        className="ms-icon-btn"
+                        onClick={() => viewDetails(sub)}
+                        title="View details"
+                      >
+                        <FileText size={16} />
+                      </button>
+                      <button
+                        className="ms-icon-btn"
                         onClick={() => window.open(`https://suiscan.xyz/testnet/object/${sub.subscriptionId}`, '_blank')}
+                        title="View on explorer"
                       >
                         <ExternalLink size={16} />
-                      </Button>
-                    </Flex>
-                  </Flex>
-                </Card>
-              ))}
-            </Grid>
-          )}
-        </Tabs.Content>
-        
-        {/* Expired Subscriptions */}
-        <Tabs.Content value="expired">
-          {expiredSubscriptions.length === 0 ? (
-            <Card>
-              <Flex direction="column" align="center" gap="3" py="4">
-                <Text size="3" color="gray">No expired subscriptions</Text>
-              </Flex>
-            </Card>
-          ) : (
-            <Grid columns={{ initial: '1', sm: '2' }} gap="3">
-              {expiredSubscriptions.map((sub) => (
-                <Card key={sub.subscriptionId} style={{ opacity: 0.8 }}>
-                  <Flex direction="column" gap="3">
-                    {/* Header */}
-                    <div>
-                      <Flex justify="between" align="start" mb="2">
-                        <Badge variant="soft" color="gray">{sub.surveyCategory}</Badge>
-                        <Badge color="red" variant="soft">
-                          <XCircle size={12} />
-                          Expired
-                        </Badge>
-                      </Flex>
-                      <Text size="3" weight="bold">{sub.surveyTitle}</Text>
-                      <Text size="2" color="gray" style={{ marginTop: '4px' }}>
-                        {sub.surveyDescription}
-                      </Text>
-                    </div>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-                    {/* Details */}
-                    <Flex direction="column" gap="2">
-                      <Flex justify="between">
-                        <Text size="2" color="gray">Expired on:</Text>
-                        <Text size="2" color="red">{formatDate(sub.expiresAt)}</Text>
-                      </Flex>
-                      
-                      <Flex justify="between">
-                        <Text size="2" color="gray">Duration:</Text>
-                        <Text size="2">{formatDuration(sub.duration)}</Text>
-                      </Flex>
-                      
-                      <Flex justify="between">
-                        <Text size="2" color="gray">Price Paid:</Text>
-                        <Text size="2">{formatPrice(sub.price)}</Text>
-                      </Flex>
-                    </Flex>
+      {/* Details Modal */}
+      {showDetailsModal && selectedSubscription && (
+        <div className="ms-modal-overlay" onClick={() => setShowDetailsModal(false)}>
+          <div className="ms-modal" onClick={e => e.stopPropagation()}>
+            <div className="ms-modal-header">
+              <h2 className="ms-modal-title">Subscription Details</h2>
+              <button 
+                className="ms-modal-close" 
+                onClick={() => setShowDetailsModal(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="ms-modal-content">
+              <div className="ms-modal-section">
+                <h3>Survey Information</h3>
+                <div className="ms-modal-info-grid">
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Title:</span>
+                    <span className="ms-modal-value">{selectedSubscription.surveyTitle}</span>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Category:</span>
+                    <span className="ms-modal-value">
+                      <span className="ms-category-badge">{selectedSubscription.surveyCategory}</span>
+                    </span>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Description:</span>
+                    <span className="ms-modal-value">{selectedSubscription.surveyDescription}</span>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Total Responses:</span>
+                    <span className="ms-modal-value">{selectedSubscription.responseCount} / {selectedSubscription.maxResponses}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="ms-modal-section">
+                <h3>Subscription Details</h3>
+                <div className="ms-modal-info-grid">
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Subscription ID:</span>
+                    <code className="ms-modal-value">{selectedSubscription.subscriptionId}</code>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Survey ID:</span>
+                    <code className="ms-modal-value">{selectedSubscription.surveyId}</code>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Price Paid:</span>
+                    <span className="ms-modal-value">{formatPrice(selectedSubscription.price)}</span>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Duration:</span>
+                    <span className="ms-modal-value">{formatDuration(selectedSubscription.duration)}</span>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Subscribed At:</span>
+                    <span className="ms-modal-value">{formatDate(selectedSubscription.createdAt)}</span>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Expires At:</span>
+                    <span className={`ms-modal-value ${selectedSubscription.isExpired ? 'expired' : ''}`}>
+                      {formatDate(selectedSubscription.expiresAt)}
+                    </span>
+                  </div>
+                  <div className="ms-modal-info-item">
+                    <span className="ms-modal-label">Status:</span>
+                    <span className="ms-modal-value">
+                      <span className={`ms-status-badge ${selectedSubscription.isExpired ? 'expired' : 'active'}`}>
+                        {selectedSubscription.isExpired ? (
+                          <>
+                            <XCircle size={12} />
+                            Expired
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={12} />
+                            Active - {getTimeRemaining(selectedSubscription.expiresAt)}
+                          </>
+                        )}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="ms-modal-actions">
+              <button 
+                className="ms-btn secondary"
+                onClick={() => viewSurveyDetails(selectedSubscription.surveyId)}
+              >
+                <FileText size={16} />
+                View Survey
+              </button>
+              {!selectedSubscription.isExpired && (
+                <button 
+                  className="ms-btn primary"
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    viewSurveyAnswers(selectedSubscription.surveyId, selectedSubscription.subscriptionId);
+                  }}
+                >
+                  <Eye size={16} />
+                  View Answers
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
-                    {/* Renew Button */}
-                    <Button
-                      size="2"
-                      variant="soft"
-                      onClick={browseMoreSubscriptions}
-                    >
-                      Renew Subscription
-                    </Button>
-                  </Flex>
-                </Card>
-              ))}
-            </Grid>
-          )}
-        </Tabs.Content>
-      </Tabs.Root>
-    </Flex>
+      {/* Toast Notifications */}
+      <div className="ms-toast-container">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`ms-toast ${toast.type}`}>
+            {toast.type === 'success' && <CheckCircle size={16} />}
+            {toast.type === 'error' && <AlertCircle size={16} />}
+            {toast.type === 'warning' && <AlertCircle size={16} />}
+            {toast.type === 'info' && <AlertCircle size={16} />}
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

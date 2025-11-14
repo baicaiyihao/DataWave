@@ -1,13 +1,22 @@
-// Create Survey Component - Router Version
-// 使用 create_survey_with_questions_entry 创建问卷
-
+// src/components/Merchant/MerchantCreateSurvey.tsx
 import React, { useState, useEffect } from 'react';
-import { Button, Card, Flex, TextField, Text, TextArea, Badge } from '@radix-ui/themes';
 import { useSignAndExecuteTransaction, useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { Transaction } from "@mysten/sui/transactions";
 import { ConfigService } from '../../services/config';
-import { Trash2, Plus, Coins } from 'lucide-react';
+import { 
+  Trash2, 
+  Plus, 
+  Coins, 
+  FileText, 
+  Radio, 
+  CheckSquare, 
+  Type,
+  Sparkles,
+  AlertCircle
+} from 'lucide-react';
+import { SuccessModal } from '../Common/SuccessModal';
+import './MerchantCreateSurvey.css';
 
 // 问题类型枚举
 enum QuestionType {
@@ -23,6 +32,85 @@ interface Question {
   options: string[];
 }
 
+// 预设问卷类别
+const SURVEY_CATEGORIES = [
+  'Feedback',
+  'Research', 
+  'Opinion',
+  'Experience',
+  'Satisfaction',
+  'Testing',
+  'Demographics',
+  'Preference',
+  'Evaluation',
+  'Knowledge',
+  'Behavioral',
+  'Other'
+];
+
+// 问卷模板
+const SURVEY_TEMPLATES = [
+  {
+    name: 'Customer Satisfaction',
+    title: 'Customer Satisfaction Survey',
+    description: 'Help us improve our service by sharing your experience',
+    category: 'Satisfaction',
+    questions: [
+      {
+        text: 'How satisfied are you with our product?',
+        type: QuestionType.SINGLE_CHOICE,
+        options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied']
+      },
+      {
+        text: 'What features do you value most?',
+        type: QuestionType.MULTIPLE_CHOICE,
+        options: ['Quality', 'Price', 'Customer Service', 'Delivery Speed', 'User Experience']
+      },
+      {
+        text: 'Any additional feedback?',
+        type: QuestionType.TEXT,
+        options: []
+      }
+    ]
+  },
+  {
+    name: 'Product Feedback',
+    title: 'Product Feedback Survey',
+    description: 'Share your thoughts on our latest product',
+    category: 'Feedback',
+    questions: [
+      {
+        text: 'How often do you use our product?',
+        type: QuestionType.SINGLE_CHOICE,
+        options: ['Daily', 'Weekly', 'Monthly', 'Rarely', 'First Time']
+      },
+      {
+        text: 'What improvements would you suggest?',
+        type: QuestionType.TEXT,
+        options: []
+      }
+    ]
+  },
+  {
+    name: 'Market Research',
+    title: 'Market Research Survey',
+    description: 'Help us understand market trends and user preferences',
+    category: 'Research',
+    questions: [
+      {
+        text: 'Which category best describes your industry?',
+        type: QuestionType.SINGLE_CHOICE,
+        options: ['Technology', 'Finance', 'Healthcare', 'Education', 'Retail', 'Other']
+      },
+      {
+        text: 'What is your primary use case?',
+        type: QuestionType.TEXT,
+        options: []
+      }
+    ]
+  }
+];
+
 export function MerchantCreateSurvey() {
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
@@ -33,7 +121,7 @@ export function MerchantCreateSurvey() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
-  const [rewardPerResponse, setRewardPerResponse] = useState('1000000000'); // 1 SUI
+  const [rewardPerResponse, setRewardPerResponse] = useState('');
   const [maxResponses, setMaxResponses] = useState('100');
   
   // 问题管理状态
@@ -49,6 +137,15 @@ export function MerchantCreateSurvey() {
   const [isCreating, setIsCreating] = useState(false);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [userBalance, setUserBalance] = useState<number | null>(null);
+  
+  // Success Modal状态
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdSurveyData, setCreatedSurveyData] = useState<{
+    id: string;
+    title: string;
+    digest: string;
+    totalCost: number;
+  } | null>(null);
   
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   
@@ -75,6 +172,14 @@ export function MerchantCreateSurvey() {
   useEffect(() => {
     getUserBalance();
   }, [currentAccount?.address]);
+
+  // 应用模板
+  const applyTemplate = (template: typeof SURVEY_TEMPLATES[0]) => {
+    setTitle(template.title);
+    setDescription(template.description);
+    setCategory(template.category);
+    setQuestions(template.questions);
+  };
   
   // 添加选项到当前问题
   const addOptionToCurrentQuestion = () => {
@@ -135,6 +240,11 @@ export function MerchantCreateSurvey() {
       return;
     }
     
+    if (!rewardPerResponse || parseFloat(rewardPerResponse) <= 0) {
+      alert('Please set a reward amount');
+      return;
+    }
+    
     if (questions.length === 0) {
       alert('Please add at least one question');
       return;
@@ -170,14 +280,18 @@ export function MerchantCreateSurvey() {
         );
       });
       
+      // 转换 reward 为 MIST (1 SUI = 1,000,000,000 MIST)
+      const rewardInMist = Math.floor(parseFloat(rewardPerResponse) * 1000000000);
+      
       // 计算总金额
-      const totalRequired = parseInt(rewardPerResponse) * parseInt(maxResponses);
+      const totalRequired = rewardInMist * parseInt(maxResponses);
       const totalWithBuffer = totalRequired + 100000000; // 加 0.1 SUI 缓冲
       
       console.log('Creating survey:', {
         title,
         category,
         questions: questions.length,
+        rewardPerResponse: rewardPerResponse + ' SUI',
         totalCost: (totalRequired / 1000000000).toFixed(3) + ' SUI'
       });
       
@@ -194,7 +308,7 @@ export function MerchantCreateSurvey() {
           tx.pure('vector<vector<u8>>', questionTexts),
           tx.pure('vector<u8>', questionTypes),
           tx.pure('vector<vector<vector<u8>>>', questionOptions),
-          tx.pure.u64(parseInt(rewardPerResponse)),
+          tx.pure.u64(rewardInMist),
           tx.pure.u64(parseInt(maxResponses)),
           paymentCoin,
           tx.object(ConfigService.getSurveyRegistryId()),
@@ -221,18 +335,53 @@ export function MerchantCreateSurvey() {
             digest: result.digest,
             options: {
               showObjectChanges: true,
+              showEffects: true,
             }
           });
+          
+          console.log('Transaction details:', txDetails);
           
           // 查找创建的 Survey ID
           let surveyId: string | null = null;
           
           if (txDetails.objectChanges) {
+            // 打印所有对象变化以调试
+            console.log('Object changes:', txDetails.objectChanges);
+            
+            // 查找 Survey 对象 (排除 dynamic_field)
             for (const change of txDetails.objectChanges) {
-              if (change.type === 'created' && 
-                  change.objectType?.includes('::survey_system::Survey')) {
-                surveyId = change.objectId;
-                break;
+              if (change.type === 'created' && change.objectType) {
+                console.log(`Created object: ${change.objectId}, Type: ${change.objectType}`);
+                
+                // 检查是否是 Survey 类型 (不是 Field 或其他类型)
+                if (change.objectType.includes('::survey_system::Survey') &&
+                    !change.objectType.includes('Field') &&
+                    !change.objectType.includes('SurveyBasicInfo') &&
+                    !change.objectType.includes('Table')) {
+                  surveyId = change.objectId;
+                  console.log('✅ Found Survey ID:', surveyId);
+                  break;
+                }
+              }
+            }
+            
+            // 如果仍然没找到，尝试从 created 对象中找到最可能的
+            if (!surveyId) {
+              const createdObjects = txDetails.objectChanges
+                .filter(c => c.type === 'created')
+                .filter(c => c.objectType && !c.objectType.includes('Field') && !c.objectType.includes('Table'));
+              
+              console.log('Created objects (non-Field):', createdObjects);
+              
+              // 查找包含 survey_system 模块的对象
+              const surveyObject = createdObjects.find(c => 
+                c.objectType?.includes('survey_system') && 
+                !c.objectType?.includes('SurveyBasicInfo')
+              );
+              
+              if (surveyObject) {
+                surveyId = surveyObject.objectId;
+                console.log('✅ Found Survey ID (fallback):', surveyId);
               }
             }
           }
@@ -245,7 +394,7 @@ export function MerchantCreateSurvey() {
               description,
               category,
               questions,
-              rewardPerResponse,
+              rewardPerResponse: rewardInMist.toString(),
               maxResponses,
               createdAt: new Date().toISOString(),
               creator: currentAccount.address,
@@ -260,48 +409,45 @@ export function MerchantCreateSurvey() {
               localStorage.setItem('survey_index', JSON.stringify(surveyIndex));
             }
             
-            // 询问是否查看详情
-            const viewDetails = window.confirm(
-              `✅ Survey Created Successfully!\n\n` +
-              `Title: ${title}\n` +
-              `Survey ID: ${surveyId.slice(0, 16)}...\n` +
-              `Reward: ${(parseInt(rewardPerResponse) / 1000000000).toFixed(3)} SUI per response\n\n` +
-              `Would you like to view the survey details?`
-            );
+            // 显示成功Modal
+            setCreatedSurveyData({
+              id: surveyId,
+              title,
+              digest: result.digest,
+              totalCost: totalRequired / 1000000000
+            });
+            setShowSuccessModal(true);
             
             // 重置表单
             setTitle('');
             setDescription('');
             setCategory('');
             setQuestions([]);
-            setRewardPerResponse('1000000000');
+            setRewardPerResponse('');
             setMaxResponses('100');
             
-            if (viewDetails) {
-              // 使用路由导航到问卷详情
-              navigate(`/survey/${surveyId}`);
-            } else {
-              // 导航到我的问卷列表
-              navigate('/enterprise/surveys');
-            }
-            
           } else {
-            alert(
-              `✅ Survey created successfully!\n\n` +
-              `Transaction: ${result.digest}\n\n` +
-              `View on explorer:\n` +
-              `https://suiscan.xyz/testnet/tx/${result.digest}`
-            );
-            
-            // 导航到我的问卷列表
-            navigate('/enterprise/surveys');
+            // 如果没有找到Survey ID，也显示成功Modal但不能查看详情
+            console.warn('⚠️ Could not find Survey ID in transaction');
+            setCreatedSurveyData({
+              id: '',
+              title,
+              digest: result.digest,
+              totalCost: totalRequired / 1000000000
+            });
+            setShowSuccessModal(true);
           }
           
         } catch (error) {
           console.error('Error fetching transaction details:', error);
-          alert(`✅ Survey created!\nTransaction: ${result.digest}`);
-          // 导航到我的问卷列表
-          navigate('/enterprise/surveys');
+          // 如果获取详情失败，也显示成功Modal
+          setCreatedSurveyData({
+            id: '',
+            title,
+            digest: result.digest,
+            totalCost: totalRequired / 1000000000
+          });
+          setShowSuccessModal(true);
         }
         
       } else {
@@ -317,246 +463,360 @@ export function MerchantCreateSurvey() {
   };
   
   // 计算成本
-  const totalCost = (parseInt(rewardPerResponse) * parseInt(maxResponses)) / 1000000000;
+  const rewardInSUI = rewardPerResponse ? parseFloat(rewardPerResponse) : 0;
+  const totalCost = rewardInSUI * parseInt(maxResponses);
   const isBalanceSufficient = userBalance !== null && userBalance >= (totalCost * 1000000000);
   
+  // 获取问题类型图标
+  const getQuestionTypeIcon = (type: QuestionType) => {
+    switch (type) {
+      case QuestionType.SINGLE_CHOICE: return <Radio size={16} />;
+      case QuestionType.MULTIPLE_CHOICE: return <CheckSquare size={16} />;
+      case QuestionType.TEXT: return <Type size={16} />;
+    }
+  };
+  
+  const getQuestionTypeName = (type: QuestionType) => {
+    switch (type) {
+      case QuestionType.SINGLE_CHOICE: return 'Single Choice';
+      case QuestionType.MULTIPLE_CHOICE: return 'Multiple Choice';
+      case QuestionType.TEXT: return 'Text Answer';
+    }
+  };
+
   return (
-    <Flex direction="column" gap="3" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div className="mcs-container">
       {/* Header */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Text size="5" weight="bold">Create Survey</Text>
-          
-          {/* Balance Display */}
-          {userBalance !== null && (
-            <Card style={{ backgroundColor: 'var(--gray-2)' }}>
-              <Flex justify="between" align="center">
-                <Flex align="center" gap="2">
-                  <Coins size={16} />
-                  <Text size="2">Wallet Balance:</Text>
-                </Flex>
-                <Text size="2" weight="bold" color={isBalanceSufficient ? 'green' : 'red'}>
-                  {(userBalance / 1000000000).toFixed(3)} SUI
-                </Text>
-              </Flex>
-            </Card>
-          )}
-          
-          {/* Basic Info */}
-          <TextField.Root
-            placeholder="Survey Title"
+      <div className="mcs-header">
+        <h1 className="mcs-title">Create Survey</h1>
+        
+        {/* Balance Display */}
+        {userBalance !== null && (
+          <div className="mcs-balance-card">
+            <div className="mcs-balance-row">
+              <div className="mcs-balance-label">
+                <Coins size={16} />
+                <span>Wallet Balance:</span>
+              </div>
+              <span className={`mcs-balance-value ${isBalanceSufficient ? 'sufficient' : 'insufficient'}`}>
+                {(userBalance / 1000000000).toFixed(3)} SUI
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Templates */}
+        <div className="mcs-template-section">
+          <div className="mcs-template-header">
+            <Sparkles size={16} />
+            <span className="mcs-template-title">Quick Templates</span>
+          </div>
+          <div className="mcs-template-grid">
+            {SURVEY_TEMPLATES.map((template, index) => (
+              <button 
+                key={index}
+                className="mcs-template-btn"
+                onClick={() => applyTemplate(template)}
+              >
+                {template.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Basic Info */}
+      <div className="mcs-form-card">
+        <div className="mcs-form-group">
+          <label className="mcs-form-label">Survey Title</label>
+          <input
+            className="mcs-input"
+            placeholder="Enter survey title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            size="3"
           />
-          
-          <TextArea
-            placeholder="Survey Description"
+        </div>
+        
+        <div className="mcs-form-group">
+          <label className="mcs-form-label">Description</label>
+          <textarea
+            className="mcs-textarea"
+            placeholder="Describe your survey purpose"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={3}
           />
-          
-          <TextField.Root
-            placeholder="Category (e.g., feedback, research, marketing)"
+        </div>
+        
+        <div className="mcs-form-group">
+          <label className="mcs-form-label">Category</label>
+          <select
+            className="mcs-select"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-          />
+          >
+            <option value="">Select a category</option>
+            {SURVEY_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Reward Settings */}
+        <div className="mcs-reward-grid">
+          <div className="mcs-reward-item">
+            <label className="mcs-form-label">Reward per Response (SUI)</label>
+            <input
+              className="mcs-input"
+              placeholder="e.g., 0.5"
+              value={rewardPerResponse}
+              onChange={(e) => setRewardPerResponse(e.target.value)}
+              type="number"
+              step="0.1"
+              min="0"
+            />
+            <span className="mcs-reward-hint">
+              {rewardInSUI > 0 && `= ${(rewardInSUI * 1000000000).toLocaleString()} MIST`}
+            </span>
+          </div>
           
-          {/* Reward Settings */}
-          <Flex gap="3">
-            <div style={{ flex: 1 }}>
-              <Text size="2" color="gray">Reward per Response (MIST)</Text>
-              <TextField.Root
-                value={rewardPerResponse}
-                onChange={(e) => setRewardPerResponse(e.target.value)}
-              />
-              <Text size="1" color="gray">
-                = {(parseInt(rewardPerResponse || '0') / 1000000000).toFixed(3)} SUI
-              </Text>
+          <div className="mcs-reward-item">
+            <label className="mcs-form-label">Maximum Responses</label>
+            <input
+              className="mcs-input"
+              value={maxResponses}
+              onChange={(e) => setMaxResponses(e.target.value)}
+              type="number"
+              min="1"
+            />
+          </div>
+        </div>
+        
+        {/* Cost Summary */}
+        {rewardInSUI > 0 && (
+          <div className="mcs-cost-card">
+            <div className="mcs-cost-row">
+              <span className="mcs-cost-label">Total Survey Cost:</span>
+              <span className="mcs-cost-value">{totalCost.toFixed(3)} SUI</span>
             </div>
-            
-            <div style={{ flex: 1 }}>
-              <Text size="2" color="gray">Maximum Responses</Text>
-              <TextField.Root
-                value={maxResponses}
-                onChange={(e) => setMaxResponses(e.target.value)}
-              />
+            <div className="mcs-cost-breakdown">
+              {parseInt(maxResponses)} responses × {rewardInSUI} SUI = {totalCost.toFixed(3)} SUI
+              <br />+ ~0.1 SUI for gas fees
             </div>
-          </Flex>
-          
-          {/* Cost Summary */}
-          <Card style={{ backgroundColor: 'var(--blue-2)' }}>
-            <Flex justify="between" align="center">
-              <Text size="2" weight="bold">Total Cost:</Text>
-              <Text size="3" weight="bold" color="blue">
-                {totalCost.toFixed(3)} SUI
-              </Text>
-            </Flex>
-            <Text size="1" color="gray">
-              (+ ~0.1 SUI for gas)
-            </Text>
-          </Card>
-        </Flex>
-      </Card>
+          </div>
+        )}
+      </div>
       
       {/* Questions Management */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="center">
-            <Text size="3" weight="bold">Questions ({questions.length})</Text>
-            <Button 
-              onClick={() => setShowQuestionForm(!showQuestionForm)} 
-              variant="soft"
-            >
-              <Plus size={16} /> Add Question
-            </Button>
-          </Flex>
-          
-          {/* Add Question Form */}
-          {showQuestionForm && (
-            <Card style={{ backgroundColor: 'var(--gray-2)' }}>
-              <Flex direction="column" gap="2">
-                <TextField.Root
-                  placeholder="Enter your question"
-                  value={currentQuestion.text}
-                  onChange={(e) => setCurrentQuestion({ ...currentQuestion, text: e.target.value })}
-                />
+      <div className="mcs-questions-card">
+        <div className="mcs-questions-header">
+          <div className="mcs-questions-title">
+            Questions
+            <span className="mcs-questions-count">{questions.length}</span>
+          </div>
+          <button 
+            onClick={() => setShowQuestionForm(!showQuestionForm)} 
+            className="mcs-add-question-btn"
+          >
+            <Plus size={16} /> Add Question
+          </button>
+        </div>
+        
+        {/* Add Question Form */}
+        {showQuestionForm && (
+          <div className="mcs-question-form">
+            <input
+              className="mcs-input"
+              placeholder="Enter your question"
+              value={currentQuestion.text}
+              onChange={(e) => setCurrentQuestion({ ...currentQuestion, text: e.target.value })}
+            />
+            
+            {/* Question Type Selection */}
+            <div className="mcs-question-type-select">
+              <button
+                className={`mcs-type-btn ${currentQuestion.type === QuestionType.SINGLE_CHOICE ? 'active' : ''}`}
+                onClick={() => setCurrentQuestion({ 
+                  ...currentQuestion, 
+                  type: QuestionType.SINGLE_CHOICE,
+                  options: []
+                })}
+              >
+                <Radio size={20} />
+                <span>Single Choice</span>
+              </button>
+              
+              <button
+                className={`mcs-type-btn ${currentQuestion.type === QuestionType.MULTIPLE_CHOICE ? 'active' : ''}`}
+                onClick={() => setCurrentQuestion({ 
+                  ...currentQuestion, 
+                  type: QuestionType.MULTIPLE_CHOICE,
+                  options: []
+                })}
+              >
+                <CheckSquare size={20} />
+                <span>Multiple Choice</span>
+              </button>
+              
+              <button
+                className={`mcs-type-btn ${currentQuestion.type === QuestionType.TEXT ? 'active' : ''}`}
+                onClick={() => setCurrentQuestion({ 
+                  ...currentQuestion, 
+                  type: QuestionType.TEXT,
+                  options: []
+                })}
+              >
+                <Type size={20} />
+                <span>Text Answer</span>
+              </button>
+            </div>
+            
+            {/* Options Management */}
+            {currentQuestion.type !== QuestionType.TEXT && (
+              <>
+                <div className="mcs-option-input-row">
+                  <input
+                    className="mcs-input mcs-option-input"
+                    placeholder="Add an option"
+                    value={currentOption}
+                    onChange={(e) => setCurrentOption(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addOptionToCurrentQuestion()}
+                  />
+                  <button onClick={addOptionToCurrentQuestion} className="mcs-add-option-btn">
+                    Add Option
+                  </button>
+                </div>
                 
-                <select
-                  value={currentQuestion.type}
-                  onChange={(e) => setCurrentQuestion({ 
-                    ...currentQuestion, 
-                    type: parseInt(e.target.value) as QuestionType,
-                    options: []
-                  })}
-                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--gray-6)' }}
-                >
-                  <option value={QuestionType.SINGLE_CHOICE}>Single Choice</option>
-                  <option value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</option>
-                  <option value={QuestionType.TEXT}>Text Answer</option>
-                </select>
-                
-                {/* Options Management */}
-                {currentQuestion.type !== QuestionType.TEXT && (
-                  <>
-                    <Flex gap="2">
-                      <TextField.Root
-                        placeholder="Add an option"
-                        value={currentOption}
-                        onChange={(e) => setCurrentOption(e.target.value)}
-                        style={{ flex: 1 }}
-                      />
-                      <Button onClick={addOptionToCurrentQuestion} size="2">
-                        Add
-                      </Button>
-                    </Flex>
-                    
-                    {currentQuestion.options.map((opt, idx) => (
-                      <Flex key={idx} justify="between" align="center">
-                        <Text size="2">• {opt}</Text>
-                        <Button
-                          size="1"
-                          variant="ghost"
-                          color="red"
-                          onClick={() => removeOptionFromCurrentQuestion(idx)}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </Flex>
-                    ))}
-                  </>
-                )}
-                
-                <Flex gap="2" justify="end">
-                  <Button onClick={() => setShowQuestionForm(false)} variant="soft">
-                    Cancel
-                  </Button>
-                  <Button onClick={addQuestion}>
-                    Save Question
-                  </Button>
-                </Flex>
-              </Flex>
-            </Card>
-          )}
-          
-          {/* Questions List */}
+                <div className="mcs-options-list">
+                  {currentQuestion.options.map((opt, idx) => (
+                    <div key={idx} className="mcs-option-item">
+                      <span className="mcs-option-text">• {opt}</span>
+                      <button
+                        className="mcs-remove-option-btn"
+                        onClick={() => removeOptionFromCurrentQuestion(idx)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            
+            <div className="mcs-question-actions">
+              <button onClick={() => setShowQuestionForm(false)} className="mcs-cancel-btn">
+                Cancel
+              </button>
+              <button onClick={addQuestion} className="mcs-save-question-btn">
+                Save Question
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Questions List */}
+        <div className="mcs-questions-list">
           {questions.map((q, index) => (
-            <Card key={index} style={{ backgroundColor: 'var(--gray-1)' }}>
-              <Flex justify="between">
-                <div style={{ flex: 1 }}>
-                  <Flex align="center" gap="2" mb="1">
-                    <Text size="2" weight="bold">Q{index + 1}:</Text>
-                    <Badge size="1" color={q.type === QuestionType.TEXT ? 'green' : 'blue'}>
-                      {['Single Choice', 'Multiple Choice', 'Text'][q.type]}
-                    </Badge>
-                  </Flex>
-                  <Text size="2">{q.text}</Text>
+            <div key={index} className="mcs-question-item">
+              <div className="mcs-question-header-row">
+                <div className="mcs-question-info">
+                  <div className="mcs-question-number">
+                    Q{index + 1}
+                    <span className="mcs-question-type-badge">
+                      {getQuestionTypeIcon(q.type)}
+                      {getQuestionTypeName(q.type)}
+                    </span>
+                  </div>
+                  <div className="mcs-question-text">{q.text}</div>
                   {q.options.length > 0 && (
-                    <Flex direction="column" gap="1" mt="2">
+                    <div className="mcs-question-options">
                       {q.options.map((opt, optIdx) => (
-                        <Text key={optIdx} size="1" color="gray">
-                          {optIdx + 1}. {opt}
-                        </Text>
+                        <div key={optIdx} className="mcs-question-option">
+                          <span>{optIdx + 1}. {opt}</span>
+                        </div>
                       ))}
-                    </Flex>
+                    </div>
                   )}
                 </div>
-                <Button 
-                  size="1" 
-                  variant="ghost" 
-                  color="red" 
+                <button 
+                  className="mcs-remove-question-btn"
                   onClick={() => removeQuestion(index)}
                 >
-                  <Trash2 size={16} />
-                </Button>
-              </Flex>
-            </Card>
+                  <Trash2 size={14} />
+                  Remove
+                </button>
+              </div>
+            </div>
           ))}
-          
-          {questions.length === 0 && !showQuestionForm && (
-            <Text size="2" color="gray" align="center">
-              No questions yet. Click "Add Question" to start.
-            </Text>
-          )}
-        </Flex>
-      </Card>
+        </div>
+        
+        {questions.length === 0 && !showQuestionForm && (
+          <div className="mcs-empty-questions">
+            <FileText size={32} style={{ opacity: 0.3 }} />
+            <p>No questions yet. Click "Add Question" to start.</p>
+          </div>
+        )}
+      </div>
       
       {/* Action Buttons */}
-      <Card>
-        <Flex direction="column" gap="2">
-          <Button
-            size="3"
+      <div className="mcs-actions-card">
+        <div className="mcs-actions-grid">
+          <button
+            className={`mcs-create-btn ${isCreating ? 'creating' : ''}`}
             onClick={handleCreateSurvey}
-            disabled={isCreating || questions.length === 0 || !currentAccount || !isBalanceSufficient}
-            style={{ width: '100%' }}
+            disabled={isCreating || questions.length === 0 || !currentAccount || !isBalanceSufficient || !rewardPerResponse}
           >
-            {isCreating ? 'Creating Survey...' : `Create Survey (Cost: ${totalCost.toFixed(3)} SUI)`}
-          </Button>
+            {isCreating ? (
+              <>
+                <div className="mcs-spinner"></div>
+                <span>Creating Survey...</span>
+              </>
+            ) : (
+              <>
+                <Plus size={20} />
+                <span>Create Survey {totalCost > 0 && `(${totalCost.toFixed(3)} SUI)`}</span>
+              </>
+            )}
+          </button>
           
-          <Button
-            size="2"
-            variant="soft"
-            onClick={() => navigate('/enterprise/surveys')}
-            style={{ width: '100%' }}
+          <button
+            className="mcs-cancel-action-btn"
+            onClick={() => navigate('/app/my-surveys')}
           >
             Cancel
-          </Button>
-        </Flex>
+          </button>
+        </div>
         
-        {!currentAccount && (
-          <Text size="2" color="red" align="center" style={{ marginTop: '8px' }}>
-            Please connect your wallet
-          </Text>
+        {(!currentAccount || !isBalanceSufficient || !rewardPerResponse || questions.length === 0) && (
+          <div className="mcs-error-message">
+            <AlertCircle size={16} />
+            {!currentAccount && 'Please connect your wallet'}
+            {currentAccount && !rewardPerResponse && 'Please set a reward amount'}
+            {currentAccount && rewardPerResponse && !isBalanceSufficient && `Insufficient balance. Need at least ${totalCost.toFixed(3)} SUI`}
+            {currentAccount && rewardPerResponse && isBalanceSufficient && questions.length === 0 && 'Please add at least one question'}
+          </div>
         )}
-        
-        {currentAccount && !isBalanceSufficient && (
-          <Text size="2" color="red" align="center" style={{ marginTop: '8px' }}>
-            Insufficient balance. Need at least {totalCost.toFixed(3)} SUI
-          </Text>
-        )}
-      </Card>
-    </Flex>
+      </div>
+      
+      {/* Success Modal */}
+      {showSuccessModal && createdSurveyData && (
+        <SuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          surveyId={createdSurveyData.id}
+          title={createdSurveyData.title}
+          txDigest={createdSurveyData.digest}
+          totalCost={createdSurveyData.totalCost}
+          onViewDetails={() => {
+            if (createdSurveyData.id) {
+              navigate(`/app/survey/${createdSurveyData.id}`);
+            }
+          }}
+          onViewList={() => {
+            navigate('/app/my-surveys');
+          }}
+        />
+      )}
+    </div>
   );
 }
 

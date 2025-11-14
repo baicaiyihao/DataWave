@@ -41,7 +41,7 @@ import {
   Clock,
   Languages
 } from 'lucide-react';
-import './HomePage.css';
+import '../css/HomePage_dark.css';
 
 // Language translations
 const translations = {
@@ -60,7 +60,7 @@ const translations = {
       title3: "Survey Research Platform",
       description: "DataWave is the first decentralized survey platform in the Sui ecosystem, connecting projects with users through blockchain technology for fair value distribution. Users earn rewards for surveys, projects get real feedback and can monetize data, creating a win-win ecosystem.",
       startEarning: "Start Earning",
-      createSurvey: "Create Survey",
+    //   createSurvey: "Create Survey",
       poweredBy: "POWERED BY"
     },
     workflow: {
@@ -553,7 +553,7 @@ const HomePage: React.FC = () => {
         <div className="nav-container">
           <div className="nav-brand">
             <img 
-              src="/logo.webp" 
+              src="/logo_white.webp" 
               alt="DataWave" 
               className="brand-logo" 
               onClick={scrollToTop}
@@ -573,7 +573,7 @@ const HomePage: React.FC = () => {
               <Languages className="w-4 h-4" />
               {language === 'en' ? 'ZH' : 'EN'}
             </button>
-            <button className="btn-outline" onClick={() => navigate('/app')}>
+            <button className="btn-outline" onClick={() => navigate('/app/marketplace')}>
               {t.nav.launchApp}
             </button>
           </div>
@@ -616,10 +616,10 @@ const HomePage: React.FC = () => {
                 {t.hero.startEarning}
                 <ArrowRight className="w-5 h-5" />
               </button>
-              <button className="btn-glass large" onClick={() => navigate('/app/create-survey')}>
+              {/* <button className="btn-glass large" onClick={() => navigate('/app/create-survey')}>
                 <Building className="w-5 h-5" />
                 {t.hero.createSurvey}
-              </button>
+              </button> */}
             </div>
             
             {/* Tech Stack */}
@@ -909,7 +909,7 @@ const HomePage: React.FC = () => {
           <div className="ecosystem-diagram">
             <div className="ecosystem-center">
               <div className="ecosystem-core">
-                <img src="/logo.webp" alt="DataWave" className="core-logo" />
+                <img src="/logo_white.webp" alt="DataWave" className="core-logo" />
               </div>
             </div>
             
@@ -972,7 +972,7 @@ const HomePage: React.FC = () => {
               {t.cta.description}
             </p>
             <div className="cta-buttons">
-              <button className="btn-primary large" onClick={() => navigate('/app')}>
+              <button className="btn-primary large" onClick={() => navigate('/app/marketplace')}>
                 {t.cta.tryNow}
                 <ArrowRight className="w-5 h-5" />
               </button>
@@ -990,7 +990,7 @@ const HomePage: React.FC = () => {
           <div className="footer-grid">
             <div className="footer-brand">
               <div className="footer-logo">
-                <img src="/logo.webp" alt="DataWave" className="footer-logo-img" />
+                <img src="/logo_white.webp" alt="DataWave" className="footer-logo-img" />
               </div>
               <p className="footer-tagline">
                 {t.footer.tagline}
@@ -1007,7 +1007,7 @@ const HomePage: React.FC = () => {
               <ul>
                 <li><a href="#features">{t.footer.features}</a></li>
                 <li><a onClick={() => navigate('/app/marketplace')}>{t.footer.marketplace}</a></li>
-                <li><a onClick={() => navigate('/app')}>{t.footer.launchApp}</a></li>
+                <li><a onClick={() => navigate('/app/marketplace')}>{t.footer.launchApp}</a></li>
               </ul>
             </div>
             

@@ -1,167 +1,136 @@
 // src/components/Layout/AppLayout.tsx
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ConnectButton } from '@mysten/dapp-kit';
+import { ConnectButton, useCurrentAccount, useDisconnectWallet, useSuiClient } from '@mysten/dapp-kit';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  // Icons
+  // Main Navigation Icons
   Grid3x3,
-  ClipboardList,
-  Coins,
-  CheckCircle,
   PlusCircle,
+  TrendingUp,
+  
+  // Profile Menu Icons
   FileText,
-  BarChart3,
-  Shield,
+  ClipboardList,
   ShoppingBag,
-  Lock,
+  CheckCircle,
+  Activity,
+  Wallet,
+  Settings,
+  LogOut,
+  ChevronRight,
+  
+  // UI Icons
   Menu,
   X,
   Languages,
-  Settings,
-  TrendingUp,
-  Sparkles
+  User
 } from 'lucide-react';
-import './AppLayout.css';
+import '../../css/AppLayout.css';
 
-interface NavItem {
+interface MainNavItem {
+  id: string;
+  label: string;
+  labelZh: string;
+  path: string;
+}
+
+interface ProfileMenuItem {
   path: string;
   label: string;
   labelZh: string;
   icon: React.ReactNode;
-  description?: string;
-  descriptionZh?: string;
-}
-
-interface NavCategory {
-  id: 'earn' | 'create' | 'trade';
-  label: string;
-  labelZh: string;
-  icon: React.ReactNode;
-  color: string;
-  items: NavItem[];
+  divider?: boolean;
 }
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const account = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const { mutate: disconnect } = useDisconnectWallet();
+  
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<'earn' | 'create' | 'trade'>('earn');
   const [language, setLanguage] = useState<'en' | 'zh'>('en');
+  const [balance, setBalance] = useState<string>('--');
 
-  // Navigation categories with better naming
-  const navCategories: NavCategory[] = [
+  // Main navigation items - similar to 
+  const mainNavItems: MainNavItem[] = [
     {
-      id: 'earn',
-      label: 'Earn',
-      labelZh: '赚取',
-      icon: <Coins size={16} />,
-      color: '#3b82f6',
-      items: [
-        {
-          path: '/app/marketplace',
-          label: 'Browse Surveys',
-          labelZh: '浏览问卷',
-          icon: <Grid3x3 size={18} />,
-          description: 'Find surveys to complete',
-          descriptionZh: '寻找可完成的问卷'
-        },
-        {
-          path: '/app/my-responses',
-          label: 'My Activity',
-          labelZh: '我的活动',
-          icon: <ClipboardList size={18} />,
-          description: 'View completed surveys',
-          descriptionZh: '查看已完成的问卷'
-        },
-        {
-          path: '/app/earnings',
-          label: 'Rewards',
-          labelZh: '奖励',
-          icon: <Sparkles size={18} />,
-          description: 'Track your earnings',
-          descriptionZh: '追踪你的收益'
-        },
-        {
-          path: '/app/allowlist',
-          label: 'VIP Access',
-          labelZh: 'VIP访问',
-          icon: <CheckCircle size={18} />,
-          description: 'Exclusive opportunities',
-          descriptionZh: '专属机会'
-        }
-      ]
+      id: 'browse',
+      label: 'Browse',
+      labelZh: '浏览',
+      path: '/app/marketplace'
     },
     {
       id: 'create',
       label: 'Create',
       labelZh: '创建',
-      icon: <PlusCircle size={16} />,
-      color: '#7c3aed',
-      items: [
-        {
-          path: '/app/create-survey',
-          label: 'New Survey',
-          labelZh: '新建问卷',
-          icon: <PlusCircle size={18} />,
-          description: 'Design a survey',
-          descriptionZh: '设计问卷'
-        },
-        {
-          path: '/app/my-surveys',
-          label: 'Manage',
-          labelZh: '管理',
-          icon: <FileText size={18} />,
-          description: 'Your survey collection',
-          descriptionZh: '你的问卷集合'
-        },
-        {
-          path: '/app/analytics',
-          label: 'Analytics',
-          labelZh: '分析',
-          icon: <BarChart3 size={18} />,
-          description: 'Data insights',
-          descriptionZh: '数据洞察'
-        },
-        {
-          path: '/app/access-control',
-          label: 'Permissions',
-          labelZh: '权限',
-          icon: <Shield size={18} />,
-          description: 'Control access',
-          descriptionZh: '控制访问'
-        }
-      ]
+      path: '/app/create-survey'
     },
     {
       id: 'trade',
-      label: 'Market',
+      label: 'Trade',
       labelZh: '交易',
-      icon: <TrendingUp size={16} />,
-      color: '#10b981',
-      items: [
-        {
-          path: '/app/subscriptions',
-          label: 'Data Market',
-          labelZh: '数据市场',
-          icon: <ShoppingBag size={18} />,
-          description: 'Buy survey data',
-          descriptionZh: '购买调研数据'
-        },
-        {
-          path: '/app/my-subscriptions',
-          label: 'Purchases',
-          labelZh: '已购买',
-          icon: <Lock size={18} />,
-          description: 'Your data access',
-          descriptionZh: '你的数据访问权'
-        }
-      ]
+      path: '/app/subscriptions'
     }
   ];
 
-  const currentCategory = navCategories.find(cat => cat.id === activeCategory);
+  // Profile menu items - personal data in wallet dropdown
+  const profileMenuItems: ProfileMenuItem[] = [
+    {
+      path: '/app/my-surveys',
+      label: 'My Surveys',
+      labelZh: '我的问卷',
+      icon: <FileText size={18} />
+    },
+    {
+      path: '/app/my-responses',
+      label: 'My Responses',
+      labelZh: '我的回答',
+      icon: <ClipboardList size={18} />
+    },
+    {
+      path: '/app/my-subscriptions',
+      label: 'My Subscriptions',
+      labelZh: '我的订阅',
+      icon: <ShoppingBag size={18} />
+    },
+    {
+      path: '/app/allowlist',
+      label: 'My Allowlist Access',
+      labelZh: '我的权限列表',
+      icon: <CheckCircle size={18} />
+    },
+    // },
+    // {
+    //   path: '/app/activity',
+    //   label: 'My Activity',
+    //   labelZh: '我的活动',
+    //   icon: <Activity size={18} />
+    // },
+    // {
+    //   path: '/app/earnings',
+    //   label: 'My Earnings',
+    //   labelZh: '我的收益',
+    //   icon: <Wallet size={18} />
+    // },
+    {
+      divider: true,
+      path: '#',
+      label: '',
+      labelZh: '',
+      icon: null
+    },
+    {
+      path: '/settings',
+      label: 'Settings',
+      labelZh: '设置',
+      icon: <Settings size={18} />
+    }
+  ];
+
   const t = (en: string, zh: string) => language === 'en' ? en : zh;
 
   const isActive = (path: string) => {
@@ -172,179 +141,236 @@ const AppLayout: React.FC = () => {
     setLanguage(prev => prev === 'en' ? 'zh' : 'en');
   };
 
-  // Auto-detect active category based on current path
-  useEffect(() => {
-    const currentPath = location.pathname;
-    for (const category of navCategories) {
-      if (category.items.some(item => isActive(item.path))) {
-        setActiveCategory(category.id);
-        break;
-      }
-    }
-  }, [location.pathname]);
+  const formatAddress = (address: string) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
 
-  // Close mobile menu on route change
+  // Fetch balance when account changes
   useEffect(() => {
+    const fetchBalance = async () => {
+      if (!account?.address) {
+        setBalance('--');
+        return;
+      }
+      
+      try {
+        const balanceResult = await suiClient.getBalance({
+          owner: account.address,
+        });
+        const balanceInSUI = (Number(balanceResult.totalBalance) / 1_000_000_000).toFixed(3);
+        setBalance(balanceInSUI);
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+        setBalance('--');
+      }
+    };
+
+    fetchBalance();
+  }, [account, suiClient]);
+
+  // Handle logout - disconnect wallet
+  const handleLogout = () => {
+    disconnect();
+    setProfileMenuOpen(false);
+    navigate('/app/marketplace');
+  };
+
+  // Close menus on route change
+  useEffect(() => {
+    setProfileMenuOpen(false);
     setMobileMenuOpen(false);
   }, [location]);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuOpen && !(e.target as Element).closest('.app-profile-dropdown')) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [profileMenuOpen]);
 
   return (
     <div className="app-layout">
       {/* Top Navigation Bar */}
       <header className="app-header">
-        <div className="header-container">
-          <div className="header-left">
+        <div className="app-header-container">
+          {/* Left: Logo and Main Nav */}
+          <div className="app-header-left">
+            <div className="app-logo" onClick={() => navigate('/app/marketplace')}>
+              <img 
+                src="/logo_white.webp" 
+                alt="DataWave" 
+                className="app-logo-img"
+              />
+            </div>
+            
+            {/* Main Navigation */}
+            <nav className="app-main-nav app-desktop-only">
+              {mainNavItems.map(item => (
+                <Link
+                  key={item.id}
+                  to={item.path}
+                  className={`app-nav-link ${isActive(item.path) ? 'active' : ''}`}
+                >
+                  {t(item.label, item.labelZh)}
+                </Link>
+              ))}
+            </nav>
+
+            {/* Mobile Menu Button */}
             <button 
-              className="menu-toggle desktop-only"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label="Toggle menu"
-            >
-              <Menu size={20} />
-            </button>
-            <button 
-              className="menu-toggle mobile-only"
+              className="app-mobile-menu-btn app-mobile-only"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle mobile menu"
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            
-            <div className="app-logo" onClick={() => navigate('/')}>
-              <img 
-                src="/logo.webp" 
-                alt="DataWave" 
-                className="logo-img"
+          </div>
+
+          {/* Center: Search or Stats (optional) */}
+          <div className="app-header-center app-desktop-only">
+            <div className="app-search-bar">
+              <input 
+                type="text" 
+                placeholder={t('Search surveys...', '搜索问卷...')}
+                className="app-search-input"
               />
             </div>
           </div>
 
-          {/* Streamlined Category Switcher */}
-          <div className="nav-categories">
-            {navCategories.map(category => (
-              <button
-                key={category.id}
-                className={`category-tab ${activeCategory === category.id ? 'active' : ''}`}
-                onClick={() => setActiveCategory(category.id)}
-                style={{ '--tab-color': category.color } as React.CSSProperties}
-              >
-                {category.icon}
-                <span className="tab-label">
-                  {t(category.label, category.labelZh)}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className="header-right">
-            <button 
-              className="lang-switch" 
+          {/* Right: Language and Wallet */}
+          <div className="app-header-right">
+            {/* <button 
+              className="app-lang-btn"
               onClick={toggleLanguage}
-              aria-label="Switch language"
             >
               <Languages size={16} />
-              <span>{language === 'en' ? '中' : 'EN'}</span>
-            </button>
+              <span className="app-desktop-only">{language === 'en' ? '中文' : 'EN'}</span>
+            </button> */}
             
-            <div className="wallet-connect">
-              <ConnectButton />
+            {/* Wallet/Profile Dropdown */}
+            <div className="app-profile-dropdown">
+              {account ? (
+                <button 
+                  className="app-profile-btn"
+                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                >
+                  <User size={18} />
+                  <span className="address">{formatAddress(account.address)}</span>
+                  <ChevronRight 
+                    size={16} 
+                    className={`arrow ${profileMenuOpen ? 'open' : ''}`}
+                  />
+                </button>
+              ) : (
+                <ConnectButton />
+              )}
+              
+              {/* Profile Menu Dropdown */}
+              <AnimatePresence>
+                {profileMenuOpen && account && (
+                  <motion.div 
+                    className="app-profile-menu"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {/* Account Info */}
+                    <div className="app-account-info">
+                      <div className="app-account-avatar">
+                        <User size={24} />
+                      </div>
+                      <div className="app-account-details">
+                        <div className="app-account-address">
+                          {formatAddress(account.address)}
+                        </div>
+                        <div className="app-account-balance">
+                          <Wallet size={12} />
+                          <span>{balance} SUI</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Menu Items */}
+                    <div className="app-profile-menu-items">
+                      {profileMenuItems.map((item, index) => (
+                        item.divider ? (
+                          <div key={index} className="app-menu-divider" />
+                        ) : (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`app-profile-menu-item ${isActive(item.path) ? 'active' : ''}`}
+                            onClick={() => setProfileMenuOpen(false)}
+                          >
+                            <span className="app-menu-icon">{item.icon}</span>
+                            <span className="app-menu-label">
+                              {t(item.label, item.labelZh)}
+                            </span>
+                          </Link>
+                        )
+                      ))}
+                      
+                      {/* Logout */}
+                      <button 
+                        className="app-profile-menu-item logout"
+                        onClick={handleLogout}
+                      >
+                        <span className="app-menu-icon"><LogOut size={18} /></span>
+                        <span className="app-menu-label">{t('Logout', '退出')}</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="app-body">
-        {/* Sidebar with current category items */}
-        <AnimatePresence>
-          {(sidebarOpen || mobileMenuOpen) && (
-            <motion.aside 
-              className={`app-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-              <nav className="sidebar-nav">
-                {/* Category Header - Simplified */}
-                <div 
-                  className="category-header"
-                  style={{ '--category-color': currentCategory?.color } as React.CSSProperties}
-                >
-                  <div className="category-badge">
-                    {currentCategory?.icon}
-                    <span className="badge-label">
-                      {currentCategory && t(currentCategory.label, currentCategory.labelZh)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Navigation Items */}
-                <div className="nav-items">
-                  {currentCategory?.items.map(item => (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`nav-item ${isActive(item.path) ? 'active' : ''}`}
-                    >
-                      <span className="item-icon">{item.icon}</span>
-                      <div className="item-content">
-                        <span className="item-label">
-                          {t(item.label, item.labelZh)}
-                        </span>
-                        {item.description && (
-                          <span className="item-desc">
-                            {t(item.description, item.descriptionZh)}
-                          </span>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </nav>
-
-              {/* Simplified Footer */}
-              <div className="sidebar-footer">
-                <button 
-                  className="settings-btn"
-                  onClick={() => {/* Handle settings */}}
-                >
-                  <Settings size={16} />
-                  <span>{t('Settings', '设置')}</span>
-                </button>
-              </div>
-            </motion.aside>
-          )}
-        </AnimatePresence>
-
-        {/* Main Content Area */}
-        <main className={`app-main ${!sidebarOpen ? 'sidebar-collapsed' : ''}`}>
-          <div className="main-container">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={location.pathname}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Outlet />
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </main>
-      </div>
-
-      {/* Mobile Overlay */}
+      {/* Mobile Navigation */}
       <AnimatePresence>
         {mobileMenuOpen && (
-          <motion.div 
-            className="mobile-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setMobileMenuOpen(false)}
-          />
+          <motion.nav 
+            className="app-mobile-nav"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+          >
+            {mainNavItems.map(item => (
+              <Link
+                key={item.id}
+                to={item.path}
+                className={`app-mobile-nav-link ${isActive(item.path) ? 'active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {t(item.label, item.labelZh)}
+              </Link>
+            ))}
+          </motion.nav>
         )}
       </AnimatePresence>
+
+      {/* Main Content */}
+      <main className="app-main">
+        <div className="app-main-container">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
     </div>
   );
 };

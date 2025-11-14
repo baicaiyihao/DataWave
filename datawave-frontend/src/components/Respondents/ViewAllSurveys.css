@@ -1,0 +1,701 @@
+/* ViewAllSurveys.css - Fixed Version with vas- prefix */
+
+.vas-container {
+  width: 100%;
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: #ffffff;
+}
+
+/* Skeleton Loading Styles */
+.vas-survey-row.skeleton {
+  pointer-events: none;
+}
+
+.vas-skeleton-box {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: vas-skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+@keyframes vas-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.vas-skeleton-title {
+  height: 18px;
+  width: 60%;
+  margin-bottom: 8px;
+}
+
+.vas-skeleton-desc {
+  height: 14px;
+  width: 80%;
+}
+
+.vas-skeleton-badge {
+  height: 26px;
+  width: 80px;
+}
+
+.vas-skeleton-reward {
+  height: 20px;
+  width: 70px;
+}
+
+.vas-skeleton-responses {
+  height: 18px;
+  width: 50px;
+}
+
+.vas-skeleton-progress {
+  height: 8px;
+  width: 100px;
+}
+
+.vas-skeleton-status {
+  height: 26px;
+  width: 70px;
+}
+
+.vas-skeleton-btn {
+  height: 30px;
+  width: 60px;
+}
+
+/* Header Tabs */
+.vas-header-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vas-tab-btn {
+  padding: 10px 24px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.vas-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.vas-tab-btn.active {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.3);
+  color: #c084fc;
+}
+
+/* Filters Bar */
+.vas-filters-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  gap: 16px;
+}
+
+.vas-filters-left {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+}
+
+.vas-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  min-width: 300px;
+  transition: all 0.2s;
+}
+
+.vas-search-box:focus-within {
+  border-color: rgba(124, 58, 237, 0.5);
+  background: rgba(124, 58, 237, 0.05);
+}
+
+.vas-search-box svg {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.vas-search-box input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 14px;
+  flex: 1;
+}
+
+.vas-search-box input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.vas-filter-select {
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+  min-width: 160px;
+}
+
+.vas-filter-select:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.vas-filter-select option {
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+.vas-refresh-btn {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.vas-refresh-btn:hover {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.3);
+  color: #c084fc;
+}
+
+.vas-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vas-spinning {
+  animation: vas-spin 1s linear infinite;
+}
+
+@keyframes vas-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Table Header */
+.vas-table-header {
+  display: grid;
+  grid-template-columns: 3fr 1fr 1fr 1fr 1.2fr 0.8fr 1.2fr;
+  gap: 16px;
+  padding: 14px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.vas-sortable {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+  user-select: none;
+}
+
+.vas-sortable:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.vas-sortable svg {
+  opacity: 0.7;
+}
+
+/* Survey List */
+.vas-survey-list {
+  min-height: 400px;
+}
+
+.vas-survey-row {
+  display: grid;
+  grid-template-columns: 3fr 1fr 1fr 1fr 1.2fr 0.8fr 1.2fr;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s;
+  align-items: center;
+}
+
+.vas-survey-row:hover:not(.skeleton) {
+  background: rgba(124, 58, 237, 0.03);
+  border-color: rgba(124, 58, 237, 0.1);
+}
+
+/* Survey Column */
+.vas-td-survey {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vas-survey-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vas-survey-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vas-survey-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 4px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.vas-survey-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.vas-survey-date svg {
+  opacity: 0.6;
+}
+
+/* Category Column */
+.vas-td-category {
+  display: flex;
+  align-items: center;
+}
+
+.vas-category-badge {
+  padding: 5px 12px;
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #c084fc;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.vas-category-badge svg {
+  opacity: 0.8;
+}
+
+.vas-category-badge:hover {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+/* Reward Column */
+.vas-td-reward {
+  display: flex;
+  align-items: center;
+}
+
+.vas-reward-amount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #10b981;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.vas-reward-amount svg {
+  opacity: 0.8;
+}
+
+.vas-reward-unit {
+  font-size: 12px;
+  font-weight: 500;
+  color: #10b981;
+  opacity: 0.8;
+  margin-left: 2px;
+}
+
+/* Responses Column */
+.vas-td-responses {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vas-responses-count {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.vas-hot-badge {
+  font-size: 14px;
+  animation: vas-pulse 1.5s infinite;
+}
+
+@keyframes vas-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* Progress Column */
+.vas-td-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vas-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  max-width: 120px;
+}
+
+.vas-progress-fill {
+  height: 100%;
+  transition: width 0.3s;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.vas-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: vas-shimmer 2s infinite;
+}
+
+@keyframes vas-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.vas-progress-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 40px;
+  text-align: right;
+  font-weight: 500;
+}
+
+/* Status Column */
+.vas-td-status {
+  display: flex;
+  align-items: center;
+}
+
+.vas-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.vas-status-badge.active {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.vas-status-badge.closed {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.vas-status-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Actions Column */
+.vas-td-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.vas-action-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.vas-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.vas-action-btn.primary {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  color: white;
+}
+
+.vas-action-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+}
+
+.vas-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.vas-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* Empty State */
+.vas-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: rgba(255, 255, 255, 0.5);
+  gap: 16px;
+}
+
+.vas-empty-state svg {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.vas-empty-state p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0;
+}
+
+/* Pagination */
+.vas-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vas-page-btn {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vas-page-btn:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.3);
+  color: #c084fc;
+}
+
+.vas-page-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.vas-page-info {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .vas-table-header,
+  .vas-survey-row {
+    grid-template-columns: 2.5fr 0.8fr 0.9fr 0.9fr 1fr 0.7fr 1.1fr;
+    font-size: 12px;
+  }
+  
+  .vas-survey-title {
+    font-size: 14px;
+  }
+  
+  .vas-action-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .vas-table-header {
+    display: none;
+  }
+  
+  .vas-survey-row,
+  .vas-survey-row.skeleton {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    margin-bottom: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .vas-survey-row:hover:not(.skeleton) {
+    background: rgba(124, 58, 237, 0.05);
+    transform: none;
+  }
+  
+  .vas-td-survey {
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 12px;
+  }
+  
+  .vas-survey-info {
+    width: 100%;
+  }
+  
+  .vas-survey-title,
+  .vas-survey-desc {
+    -webkit-line-clamp: 2;
+  }
+  
+  .vas-td-category,
+  .vas-td-reward,
+  .vas-td-responses,
+  .vas-td-progress,
+  .vas-td-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+  }
+  
+  .vas-td-category::before { content: 'Type:'; }
+  .vas-td-reward::before { content: 'Reward:'; }
+  .vas-td-responses::before { content: 'Responses:'; }
+  .vas-td-progress::before { content: 'Progress:'; }
+  .vas-td-status::before { content: 'Status:'; }
+  
+  .vas-td-category::before,
+  .vas-td-reward::before,
+  .vas-td-responses::before,
+  .vas-td-progress::before,
+  .vas-td-status::before {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+  
+  .vas-td-actions {
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 12px;
+  }
+  
+  .vas-action-btn {
+    flex: 1;
+  }
+  
+  .vas-filters-left {
+    flex-direction: column;
+  }
+  
+  .vas-search-box {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .vas-filter-select {
+    width: 100%;
+  }
+  
+  /* Skeleton mobile adjustments */
+  .vas-skeleton-box {
+    margin: 4px 0;
+  }
+}

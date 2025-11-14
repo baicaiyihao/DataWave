@@ -1,8 +1,5 @@
-// My Allowlist Access Page - Router Version
-// 查看我被加入白名单的问卷
-
+// src/components/Access/MyAllowlistAccess.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, Flex, Text, Badge, Button, Grid, Tabs } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
@@ -19,8 +16,15 @@ import {
   ChevronRight,
   Search,
   Filter,
-  Key
+  Key,
+  Wallet,
+  CheckCircle,
+  AlertCircle,
+  Hash,
+  Activity,
+  Database
 } from 'lucide-react';
+import './MyAllowlistAccess.css';
 
 interface AllowlistSurvey {
   id: string;
@@ -51,16 +55,17 @@ export function MyAllowlistAccess() {
   const [surveys, setSurveys] = useState<AllowlistSurvey[]>([]);
   const [filteredSurveys, setFilteredSurveys] = useState<AllowlistSurvey[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'with-answers'>('all');
   
-  // 筛选和分页
+  // Filtering and pagination
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [categories, setCategories] = useState<string[]>(['all']);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(9);
+  const [itemsPerPage] = useState(9);
   
-  // 统计
+  // Statistics
   const [stats, setStats] = useState({
     totalAccess: 0,
     activeAccess: 0,
@@ -68,17 +73,31 @@ export function MyAllowlistAccess() {
     totalAnswers: 0,
   });
 
-  // Navigation functions
+  // Toast notifications
+  const [toasts, setToasts] = useState<Array<{
+    id: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    message: string;
+  }>>([]);
+
+  const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 3000);
+  };
+
+  // Navigation functions - Updated routes
   const viewSurveyDetails = (surveyId: string) => {
-    navigate(`/survey/${surveyId}`);
+    navigate(`/app/survey/${surveyId}`);
   };
 
   const startDecryption = (surveyId: string) => {
-    // Navigate to the allowlist decrypt page
-    navigate(`/allowlist/decrypt/${surveyId}`);
+    navigate(`/app/analytics`); // Or specific decrypt page if needed
   };
 
-  // 加载用户在 allowlist 中的问卷
+  // Load surveys where user is in allowlist
   const loadAllowlistSurveys = async () => {
     if (!currentAccount?.address) return;
     
@@ -86,7 +105,7 @@ export function MyAllowlistAccess() {
     try {
       const allowlistSurveys: AllowlistSurvey[] = [];
       
-      // 从 Registry 获取所有问卷
+      // Get all surveys from Registry
       const registryId = ConfigService.getSurveyRegistryId();
       const registry = await suiClient.getObject({
         id: registryId,
@@ -108,12 +127,12 @@ export function MyAllowlistAccess() {
               limit: 50,
             });
             
-            // 处理每个问卷
+            // Process each survey
             for (const field of dynamicFields.data) {
               try {
                 const surveyId = field.name.value as string;
                 
-                // 获取问卷详情
+                // Get survey details
                 const surveyObj = await suiClient.getObject({
                   id: surveyId,
                   options: { showContent: true }
@@ -122,7 +141,7 @@ export function MyAllowlistAccess() {
                 if (surveyObj.data?.content && 'fields' in surveyObj.data.content) {
                   const surveyFields = surveyObj.data.content.fields as any;
                   
-                  // 检查 allowlist
+                  // Check allowlist
                   let isInAllowlist = false;
                   let allowlistSize = 0;
                   
@@ -136,22 +155,22 @@ export function MyAllowlistAccess() {
                     isInAllowlist = allowlist.includes(currentAccount.address);
                   }
                   
-                  // 如果用户在 allowlist 中
+                  // If user is in allowlist
                   if (isInAllowlist) {
-                    // 解析问题
+                    // Parse questions
                     const questions = surveyFields.questions?.map((q: any) => ({
                       question_text: q.fields?.question_text || q.question_text || '',
                       question_type: parseInt(q.fields?.question_type || q.question_type || '0'),
                       options: q.fields?.options || q.options || []
                     })) || [];
                     
-                    // 统计答案数量
+                    // Count answers
                     let answerCount = 0;
                     if (surveyFields.encrypted_answer_blobs?.fields?.id?.id) {
                       try {
                         const answersTableFields = await suiClient.getDynamicFields({
                           parentId: surveyFields.encrypted_answer_blobs.fields.id.id,
-                          limit: 1, // 只需要知道数量
+                          limit: 1,
                         });
                         answerCount = answersTableFields.data.length;
                       } catch (e) {
@@ -171,7 +190,7 @@ export function MyAllowlistAccess() {
                       maxResponses: parseInt(surveyFields.max_responses || '0'),
                       questions,
                       allowlistSize,
-                      canDecrypt: true, // 在 allowlist 中就可以解密
+                      canDecrypt: true,
                       hasAnswers: answerCount > 0,
                       answerCount,
                     });
@@ -188,7 +207,7 @@ export function MyAllowlistAccess() {
         }
       }
       
-      // 按创建时间排序
+      // Sort by creation time
       allowlistSurveys.sort((a, b) => {
         return parseInt(b.createdAt || '0') - parseInt(a.createdAt || '0');
       });
@@ -196,11 +215,11 @@ export function MyAllowlistAccess() {
       setSurveys(allowlistSurveys);
       setFilteredSurveys(allowlistSurveys);
       
-      // 提取类别
+      // Extract categories
       const uniqueCategories = Array.from(new Set(allowlistSurveys.map(s => s.category)));
       setCategories(['all', ...uniqueCategories]);
       
-      // 计算统计
+      // Calculate statistics
       const activeCount = allowlistSurveys.filter(s => s.isActive).length;
       const withAnswersCount = allowlistSurveys.filter(s => s.hasAnswers).length;
       const totalAnswers = allowlistSurveys.reduce((sum, s) => sum + s.answerCount, 0);
@@ -212,30 +231,40 @@ export function MyAllowlistAccess() {
         totalAnswers,
       });
       
+      if (!loading) {
+        showToast('success', `Found ${allowlistSurveys.length} surveys with allowlist access`);
+      }
     } catch (error) {
       console.error('Error loading allowlist surveys:', error);
+      showToast('error', 'Failed to load allowlist surveys');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // 应用筛选
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadAllowlistSurveys();
+  };
+
+  // Apply filters
   useEffect(() => {
     let filtered = [...surveys];
     
-    // Tab 筛选
+    // Tab filter
     if (activeTab === 'active') {
       filtered = filtered.filter(s => s.isActive);
     } else if (activeTab === 'with-answers') {
       filtered = filtered.filter(s => s.hasAnswers);
     }
     
-    // 类别筛选
+    // Category filter
     if (filterCategory !== 'all') {
       filtered = filtered.filter(s => s.category === filterCategory);
     }
     
-    // 搜索筛选
+    // Search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(s => 
@@ -249,332 +278,374 @@ export function MyAllowlistAccess() {
     setCurrentPage(1);
   }, [searchTerm, filterCategory, activeTab, surveys]);
 
-  // 初始加载
+  // Initial load
   useEffect(() => {
     if (currentAccount?.address) {
       loadAllowlistSurveys();
+    } else {
+      setLoading(false);
     }
   }, [currentAccount?.address]);
 
-  // 分页计算
+  // Pagination calculation
   const totalPages = Math.ceil(filteredSurveys.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentSurveys = filteredSurveys.slice(startIndex, endIndex);
 
-  // 格式化函数
+  // Format functions
   const formatDate = (timestamp: string) => {
     const date = new Date(parseInt(timestamp));
     return date.toLocaleDateString();
   };
 
+  const getCompletionRate = (current: number, max: number) => {
+    if (max === 0) return 0;
+    return (current / max) * 100;
+  };
+
+  // Skeleton Card Component
+  const SkeletonCard = () => (
+    <div className="mal-skeleton-card">
+      <div className="mal-skeleton-header">
+        <div className="mal-skeleton-badge"></div>
+        <div className="mal-skeleton-badges"></div>
+      </div>
+      <div className="mal-skeleton-title"></div>
+      <div className="mal-skeleton-description"></div>
+      <div className="mal-skeleton-info">
+        <div className="mal-skeleton-info-item"></div>
+        <div className="mal-skeleton-info-item"></div>
+        <div className="mal-skeleton-info-item"></div>
+      </div>
+      <div className="mal-skeleton-access"></div>
+      <div className="mal-skeleton-actions">
+        <div className="mal-skeleton-button"></div>
+        <div className="mal-skeleton-button"></div>
+      </div>
+    </div>
+  );
+
   if (!currentAccount) {
     return (
-      <Card>
-        <Flex direction="column" align="center" gap="3" py="5">
-          <Text size="4" weight="bold">Connect Wallet</Text>
-          <Text size="2" color="gray">Please connect your wallet to view your allowlist access</Text>
-        </Flex>
-      </Card>
+      <div className="mal-container">
+        <div className="mal-connect-wallet">
+          <Wallet size={48} />
+          <h2>Connect Your Wallet</h2>
+          <p>Please connect your wallet to view your allowlist access</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Flex direction="column" gap="3">
+    <div className="mal-container">
       {/* Header with Stats */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="center">
-            <div>
-              <Text size="5" weight="bold">My Allowlist Access</Text>
-              <Text size="2" color="gray">Surveys where you have decryption access</Text>
+      <div className="mal-header">
+        <div className="mal-header-content">
+          <div className="mal-header-info">
+            <h1 className="mal-title">My Allowlist Access</h1>
+            <p className="mal-subtitle">Surveys where you have decryption privileges</p>
+          </div>
+          <button 
+            className="mal-btn secondary" 
+            onClick={handleRefresh} 
+            disabled={refreshing}
+          >
+            <RefreshCw size={16} className={refreshing ? 'mal-spinning' : ''} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+        
+        {/* Stats Cards */}
+        <div className="mal-stats-grid">
+          <div className="mal-stat-card">
+            <div className="mal-stat-icon purple">
+              <Shield size={20} />
             </div>
-            <Button onClick={loadAllowlistSurveys} variant="soft" disabled={loading}>
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Loading...' : 'Refresh'}
-            </Button>
-          </Flex>
+            <div className="mal-stat-content">
+              <div className="mal-stat-label">Total Access</div>
+              <div className="mal-stat-value">{stats.totalAccess}</div>
+            </div>
+          </div>
           
-          {/* Stats Cards */}
-          <Grid columns="4" gap="3">
-            <Card style={{ backgroundColor: 'var(--purple-2)' }}>
-              <Flex direction="column" gap="1">
-                <Flex align="center" gap="1">
-                  <Shield size={14} />
-                  <Text size="1" color="gray">Total Access</Text>
-                </Flex>
-                <Text size="4" weight="bold">{stats.totalAccess}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ backgroundColor: 'var(--green-2)' }}>
-              <Flex direction="column" gap="1">
-                <Flex align="center" gap="1">
-                  <Unlock size={14} />
-                  <Text size="1" color="gray">Active Surveys</Text>
-                </Flex>
-                <Text size="4" weight="bold" color="green">{stats.activeAccess}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ backgroundColor: 'var(--blue-2)' }}>
-              <Flex direction="column" gap="1">
-                <Flex align="center" gap="1">
-                  <FileText size={14} />
-                  <Text size="1" color="gray">With Answers</Text>
-                </Flex>
-                <Text size="4" weight="bold">{stats.withAnswers}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ backgroundColor: 'var(--orange-2)' }}>
-              <Flex direction="column" gap="1">
-                <Flex align="center" gap="1">
-                  <Users size={14} />
-                  <Text size="1" color="gray">Total Answers</Text>
-                </Flex>
-                <Text size="4" weight="bold">{stats.totalAnswers}</Text>
-              </Flex>
-            </Card>
-          </Grid>
-        </Flex>
-      </Card>
+          <div className="mal-stat-card">
+            <div className="mal-stat-icon green">
+              <Activity size={20} />
+            </div>
+            <div className="mal-stat-content">
+              <div className="mal-stat-label">Active Surveys</div>
+              <div className="mal-stat-value success">{stats.activeAccess}</div>
+            </div>
+          </div>
+          
+          <div className="mal-stat-card">
+            <div className="mal-stat-icon blue">
+              <Database size={20} />
+            </div>
+            <div className="mal-stat-content">
+              <div className="mal-stat-label">With Answers</div>
+              <div className="mal-stat-value">{stats.withAnswers}</div>
+            </div>
+          </div>
+          
+          <div className="mal-stat-card">
+            <div className="mal-stat-icon orange">
+              <FileText size={20} />
+            </div>
+            <div className="mal-stat-content">
+              <div className="mal-stat-label">Total Answers</div>
+              <div className="mal-stat-value">{stats.totalAnswers}</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Tabs and Filters */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Tabs.Root value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-            <Tabs.List>
-              <Tabs.Trigger value="all">All ({surveys.length})</Tabs.Trigger>
-              <Tabs.Trigger value="active">Active ({surveys.filter(s => s.isActive).length})</Tabs.Trigger>
-              <Tabs.Trigger value="with-answers">With Answers ({surveys.filter(s => s.hasAnswers).length})</Tabs.Trigger>
-            </Tabs.List>
-          </Tabs.Root>
-          
-          <Flex gap="3" align="center">
-            <Filter size={16} />
+      <div className="mal-filters-section">
+        {/* Tabs */}
+        <div className="mal-tabs">
+          <button 
+            className={`mal-tab ${activeTab === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveTab('all')}
+          >
+            All
+            <span className="mal-tab-count">{surveys.length}</span>
+          </button>
+          <button 
+            className={`mal-tab ${activeTab === 'active' ? 'active' : ''}`}
+            onClick={() => setActiveTab('active')}
+          >
+            <Activity size={14} />
+            Active
+            <span className="mal-tab-count">{surveys.filter(s => s.isActive).length}</span>
+          </button>
+          <button 
+            className={`mal-tab ${activeTab === 'with-answers' ? 'active' : ''}`}
+            onClick={() => setActiveTab('with-answers')}
+          >
+            <Database size={14} />
+            With Answers
+            <span className="mal-tab-count">{surveys.filter(s => s.hasAnswers).length}</span>
+          </button>
+        </div>
+        
+        {/* Filter Controls */}
+        <div className="mal-filter-controls">
+          <div className="mal-search-box">
+            <Search size={16} />
             <input
               type="text"
               placeholder="Search surveys..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--gray-6)',
-                flex: 1,
-                maxWidth: '300px'
-              }}
+              className="mal-search-input"
             />
-            
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--gray-6)'
-              }}
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>
-                  {cat === 'all' ? 'All Categories' : cat}
-                </option>
-              ))}
-            </select>
-            
-            <select
-              value={itemsPerPage}
-              onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--gray-6)'
-              }}
-            >
-              <option value="9">9 per page</option>
-              <option value="18">18 per page</option>
-              <option value="36">36 per page</option>
-            </select>
-          </Flex>
-        </Flex>
-      </Card>
+          </div>
+          
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="mal-filter-select"
+          >
+            {categories.map(cat => (
+              <option key={cat} value={cat}>
+                {cat === 'all' ? 'All Categories' : cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Surveys Grid */}
-      {loading ? (
-        <Card>
-          <Text align="center" size="3">Loading your allowlist access...</Text>
-        </Card>
-      ) : currentSurveys.length === 0 ? (
-        <Card>
-          <Flex direction="column" align="center" gap="3" py="5">
-            <Lock size={48} color="gray" />
-            <Text size="3" weight="bold">
+      <div className="mal-surveys-section">
+        {loading ? (
+          <div className="mal-surveys-grid">
+            {[...Array(6)].map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : currentSurveys.length === 0 ? (
+          <div className="mal-empty-state">
+            <Lock size={48} />
+            <h3>
               {filteredSurveys.length === 0 
                 ? (surveys.length === 0 
                   ? "No Allowlist Access"
                   : "No surveys match your filters")
                 : "No surveys on this page"}
-            </Text>
-            <Text size="2" color="gray">
+            </h3>
+            <p>
               {surveys.length === 0 && "You haven't been added to any survey allowlists yet"}
-            </Text>
-          </Flex>
-        </Card>
-      ) : (
-        <Grid columns={{ initial: '1', sm: '2', md: '3' }} gap="3">
-          {currentSurveys.map((survey) => (
-            <Card key={survey.id}>
-              <Flex direction="column" gap="3">
-                {/* Header */}
-                <div>
-                  <Flex justify="between" align="start" mb="2">
-                    <Badge variant="soft">{survey.category}</Badge>
-                    <Flex gap="1">
-                      <Badge color={survey.isActive ? 'green' : 'gray'} size="1">
-                        {survey.isActive ? 'Active' : 'Closed'}
-                      </Badge>
-                      {survey.hasAnswers && (
-                        <Badge color="blue" size="1">
-                          Has Answers
-                        </Badge>
+            </p>
+          </div>
+        ) : (
+          <div className="mal-surveys-grid">
+            {currentSurveys.map((survey) => (
+              <div key={survey.id} className="mal-survey-card">
+                {/* Card Header */}
+                <div className="mal-card-header">
+                  <span className="mal-category-badge">{survey.category}</span>
+                  <div className="mal-header-badges">
+                    <span className={`mal-status-badge ${survey.isActive ? 'active' : 'inactive'}`}>
+                      {survey.isActive ? (
+                        <>
+                          <CheckCircle size={12} />
+                          Active
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={12} />
+                          Closed
+                        </>
                       )}
-                    </Flex>
-                  </Flex>
-                  <Text size="3" weight="bold">{survey.title}</Text>
-                  <Text size="2" color="gray" style={{ 
-                    marginTop: '4px',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {survey.description}
-                  </Text>
+                    </span>
+                    {survey.hasAnswers && (
+                      <span className="mal-answers-badge">
+                        <Database size={12} />
+                        {survey.answerCount}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Info */}
-                <Flex direction="column" gap="2">
-                  <Flex justify="between">
-                    <Text size="1" color="gray">Created:</Text>
-                    <Text size="1">{formatDate(survey.createdAt)}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="1" color="gray">Questions:</Text>
-                    <Text size="1">{survey.questions.length}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="1" color="gray">Responses:</Text>
-                    <Text size="1">{survey.currentResponses}/{survey.maxResponses}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="1" color="gray">Allowlist Size:</Text>
-                    <Text size="1">{survey.allowlistSize} addresses</Text>
-                  </Flex>
-                  {survey.hasAnswers && (
-                    <Flex justify="between">
-                      <Text size="1" color="gray">Answer Count:</Text>
-                      <Text size="1" weight="bold">{survey.answerCount}</Text>
-                    </Flex>
-                  )}
-                </Flex>
+                {/* Card Content */}
+                <h3 className="mal-card-title">{survey.title}</h3>
+                <p className="mal-card-description">{survey.description}</p>
+
+                {/* Survey Info */}
+                <div className="mal-card-info">
+                  <div className="mal-info-item">
+                    <Calendar size={14} />
+                    <span className="mal-info-label">Created:</span>
+                    <span className="mal-info-value">{formatDate(survey.createdAt)}</span>
+                  </div>
+                  <div className="mal-info-item">
+                    <FileText size={14} />
+                    <span className="mal-info-label">Questions:</span>
+                    <span className="mal-info-value">{survey.questions.length}</span>
+                  </div>
+                  <div className="mal-info-item">
+                    <Users size={14} />
+                    <span className="mal-info-label">Responses:</span>
+                    <span className="mal-info-value">{survey.currentResponses}/{survey.maxResponses}</span>
+                  </div>
+                  <div className="mal-info-item">
+                    <Shield size={14} />
+                    <span className="mal-info-label">Allowlist:</span>
+                    <span className="mal-info-value">{survey.allowlistSize} addresses</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mal-progress-section">
+                  <div className="mal-progress-bar">
+                    <div 
+                      className="mal-progress-fill"
+                      style={{ width: `${Math.min(100, getCompletionRate(survey.currentResponses, survey.maxResponses))}%` }}
+                    />
+                  </div>
+                  <div className="mal-progress-text">
+                    {getCompletionRate(survey.currentResponses, survey.maxResponses).toFixed(0)}% Complete
+                  </div>
+                </div>
 
                 {/* Access Badge */}
-                <Card style={{ backgroundColor: 'var(--purple-1)' }}>
-                  <Flex align="center" justify="center" gap="2">
-                    <Key size={14} />
-                    <Text size="2" weight="bold" color="purple">
-                      Decryption Access Granted
-                    </Text>
-                  </Flex>
-                </Card>
+                <div className="mal-access-badge">
+                  <Key size={14} />
+                  <span>Decryption Access Granted</span>
+                </div>
 
-                {/* Actions */}
-                <Flex gap="2">
-                  <Button 
-                    size="2" 
-                    variant="soft"
-                    style={{ flex: 1 }}
+                {/* Card Actions */}
+                <div className="mal-card-actions">
+                  <button 
+                    className="mal-action-btn secondary"
                     onClick={() => viewSurveyDetails(survey.id)}
                   >
                     <Eye size={16} />
                     View Details
-                  </Button>
+                  </button>
                   {survey.hasAnswers && (
-                    <Button 
-                      size="2"
-                      style={{ flex: 1 }}
+                    <button 
+                      className="mal-action-btn primary"
                       onClick={() => startDecryption(survey.id)}
                     >
                       <Unlock size={16} />
                       Decrypt
-                    </Button>
+                    </button>
                   )}
-                </Flex>
-              </Flex>
-            </Card>
-          ))}
-        </Grid>
-      )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Card>
-          <Flex justify="between" align="center">
-            <Text size="2" color="gray">
-              Showing {startIndex + 1}-{Math.min(endIndex, filteredSurveys.length)} of {filteredSurveys.length} surveys
-            </Text>
+        <div className="mal-pagination">
+          <div className="mal-pagination-info">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredSurveys.length)} of {filteredSurveys.length} surveys
+          </div>
+          
+          <div className="mal-pagination-controls">
+            <button 
+              className="mal-pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft size={16} />
+            </button>
             
-            <Flex gap="2" align="center">
-              <Button 
-                size="2" 
-                variant="soft"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft size={16} />
-              </Button>
-              
-              <Flex gap="1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  return (
-                    <Button
-                      key={i}
-                      size="2"
-                      variant={pageNum === currentPage ? 'solid' : 'soft'}
-                      onClick={() => setCurrentPage(pageNum)}
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-              </Flex>
-              
-              <Button 
-                size="2" 
-                variant="soft"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </Flex>
-          </Flex>
-        </Card>
+            <div className="mal-pagination-numbers">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={i}
+                    className={`mal-pagination-number ${pageNum === currentPage ? 'active' : ''}`}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button 
+              className="mal-pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
       )}
-    </Flex>
+
+      {/* Toast Notifications */}
+      <div className="mal-toast-container">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`mal-toast ${toast.type}`}>
+            {toast.type === 'success' && <CheckCircle size={16} />}
+            {toast.type === 'error' && <AlertCircle size={16} />}
+            {toast.type === 'warning' && <AlertCircle size={16} />}
+            {toast.type === 'info' && <AlertCircle size={16} />}
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -1,8 +1,5 @@
-// Browse Subscription Services - Router Version
-// 获取所有开启订阅服务的问卷并支持购买
-
+// src/components/BrowseSubscriptions.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, Flex, Text, Badge, Button, Grid, TextField } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
@@ -21,8 +18,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  Gift
+  Star,
+  Award,
+  Zap,
+  BarChart,
+  ArrowRight
 } from 'lucide-react';
+import './BrowseSubscriptions.css';
 
 interface SubscriptionSurvey {
   surveyId: string;
@@ -59,22 +61,22 @@ export function BrowseSubscriptions() {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   
-  // 筛选状态
+  // 筛选状态 - 默认排序改为newest
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'subscribed' | 'available'>('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'revenue' | 'price'>('newest');
   const [categories, setCategories] = useState<string[]>(['all']);
   
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const [itemsPerPage] = useState(10);
   
   // 统计
   const [stats, setStats] = useState({
-    totalServices: 0,
-    subscribedCount: 0,
-    availableCount: 0,
-    totalRevenue: 0,
+    hottest: null as SubscriptionSurvey | null,
+    newest: null as SubscriptionSurvey | null,
+    mostAffordable: null as SubscriptionSurvey | null,
   });
   
   const { mutate: signAndExecute } = useSignAndExecuteTransaction({
@@ -91,13 +93,15 @@ export function BrowseSubscriptions() {
 
   // Navigation functions
   const viewSurveyDetails = (surveyId: string) => {
-    navigate(`/survey/${surveyId}`);
+    navigate(`/app/survey/${surveyId}`);
   };
 
   const viewSubscriptionAnswers = (surveyId: string, subscriptionId?: string) => {
-    // 导航到带有订阅权限的解密页面
-    navigate(`/subscription/decrypt/${surveyId}`, { 
-      state: { subscriptionId } 
+    navigate(`/app/subscription-decrypt/${surveyId}`, { 
+      state: { 
+        subscriptionId,
+        returnPath: '/app/subscriptions'
+      } 
     });
   };
 
@@ -107,7 +111,7 @@ export function BrowseSubscriptions() {
     try {
       const allSubscriptionSurveys: SubscriptionSurvey[] = [];
       
-      // 1. 首先获取当前用户的所有订阅（如果已登录）
+      // 1. 获取当前用户的所有订阅
       const userSubMap = new Map<string, any>();
       if (currentAccount?.address) {
         const userSubscriptions = await suiClient.getOwnedObjects({
@@ -152,12 +156,9 @@ export function BrowseSubscriptions() {
               limit: 50,
             });
             
-            // 处理每个问卷
             for (const field of dynamicFields.data) {
               try {
                 const surveyId = field.name.value as string;
-                
-                // 获取问卷详情
                 const surveyObj = await suiClient.getObject({
                   id: surveyId,
                   options: { showContent: true }
@@ -165,12 +166,9 @@ export function BrowseSubscriptions() {
                 
                 if (surveyObj.data?.content && 'fields' in surveyObj.data.content) {
                   const surveyFields = surveyObj.data.content.fields as any;
-                  
-                  // 检查是否有订阅服务
                   const subscriptionServiceId = surveyFields.subscription_service_id;
                   
-                  if (subscriptionServiceId) {
-                    // 获取订阅服务详情
+                  if (subscriptionServiceId && subscriptionServiceId !== '0x0') {
                     const serviceObj = await suiClient.getObject({
                       id: subscriptionServiceId,
                       options: { showContent: true }
@@ -179,7 +177,6 @@ export function BrowseSubscriptions() {
                     if (serviceObj.data?.content && 'fields' in serviceObj.data.content) {
                       const serviceFields = serviceObj.data.content.fields as any;
                       
-                      // 获取订阅者数量
                       let subscriberCount = 0;
                       try {
                         const subscriptionEvents = await suiClient.queryEvents({
@@ -196,7 +193,6 @@ export function BrowseSubscriptions() {
                         console.error('Error getting subscriber count:', e);
                       }
                       
-                      // 检查用户是否已订阅
                       const userSub = userSubMap.get(surveyId);
                       const now = Date.now();
                       const isSubscribed = userSub && userSub.expiresAt > now;
@@ -236,8 +232,8 @@ export function BrowseSubscriptions() {
         }
       }
       
-      // 按总收入排序
-      allSubscriptionSurveys.sort((a, b) => b.totalRevenue - a.totalRevenue);
+      // 默认按创建时间排序（最新的在前）
+      allSubscriptionSurveys.sort((a, b) => parseInt(b.createdAt) - parseInt(a.createdAt));
       
       setServices(allSubscriptionSurveys);
       setFilteredServices(allSubscriptionSurveys);
@@ -246,16 +242,19 @@ export function BrowseSubscriptions() {
       const uniqueCategories = Array.from(new Set(allSubscriptionSurveys.map(s => s.category)));
       setCategories(['all', ...uniqueCategories]);
       
-      // 计算统计
-      const subscribedCount = allSubscriptionSurveys.filter(s => s.isSubscribed).length;
-      const totalRevenue = allSubscriptionSurveys.reduce((sum, s) => sum + s.totalRevenue, 0);
-      
-      setStats({
-        totalServices: allSubscriptionSurveys.length,
-        subscribedCount,
-        availableCount: allSubscriptionSurveys.length - subscribedCount,
-        totalRevenue,
-      });
+      // 计算特色推荐
+      if (allSubscriptionSurveys.length > 0) {
+        const sorted = [...allSubscriptionSurveys];
+        const hottest = sorted.sort((a, b) => b.subscriberCount - a.subscriberCount)[0];
+        const newest = [...allSubscriptionSurveys].sort((a, b) => parseInt(b.createdAt) - parseInt(a.createdAt))[0];
+        const mostAffordable = [...allSubscriptionSurveys].filter(s => s.price > 0).sort((a, b) => a.price - b.price)[0];
+        
+        setStats({
+          hottest: hottest || null,
+          newest: newest || null,
+          mostAffordable: mostAffordable || null,
+        });
+      }
       
     } catch (error) {
       console.error('Error loading subscription surveys:', error);
@@ -264,31 +263,71 @@ export function BrowseSubscriptions() {
     }
   };
 
-  // 购买订阅
+  // 成功提示模态框
+  const showSuccessModal = (message: string, onClose: () => void) => {
+    const modal = document.createElement('div');
+    modal.className = 'bs-success-modal';
+    modal.innerHTML = `
+      <div class="bs-success-modal-content">
+        <div class="bs-success-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+        <div class="bs-success-message">${message}</div>
+        <div class="bs-success-progress"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // 2.5秒后自动跳转
+    setTimeout(() => {
+      document.body.removeChild(modal);
+      onClose();
+    }, 2500);
+  };
+
+  // 错误提示模态框
+  const showErrorModal = (title: string, message: string) => {
+    const modal = document.createElement('div');
+    modal.className = 'bs-error-modal';
+    modal.innerHTML = `
+      <div class="bs-error-modal-content">
+        <div class="bs-error-icon">⚠️</div>
+        <div class="bs-error-title">${title}</div>
+        <div class="bs-error-message">${message}</div>
+        <button class="bs-error-close">OK</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    
+    modal.querySelector('.bs-error-close')?.addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+  };
+
+  // 购买订阅 - 成功后跳转
   const purchaseSubscription = (service: SubscriptionSurvey) => {
     if (!currentAccount?.address) {
-      alert('Please connect your wallet first');
+      const shouldConnect = confirm('Please connect your wallet to subscribe.\n\nWould you like to connect now?');
       return;
     }
     
     setPurchasing(service.subscriptionServiceId);
     
     const tx = new Transaction();
-    
-    // 分割精确金额
     const [coin] = tx.splitCoins(tx.gas, [service.price]);
-    
-    // 获取 Treasury ID
     const treasuryId = ConfigService.getPlatformTreasuryId();
     
     tx.moveCall({
       target: `${packageId}::survey_system::purchase_subscription_entry`,
       arguments: [
-        tx.object(service.subscriptionServiceId), // SubscriptionService
-        tx.object(service.surveyId), // Survey  
-        coin, // Payment
-        tx.object(treasuryId), // PlatformTreasury
-        tx.object('0x6'), // Clock
+        tx.object(service.subscriptionServiceId),
+        tx.object(service.surveyId),
+        coin,
+        tx.object(treasuryId),
+        tx.object('0x6'),
       ],
     });
     
@@ -298,19 +337,30 @@ export function BrowseSubscriptions() {
         onSuccess: (result) => {
           console.log('Subscription purchased:', result);
           
-          // 查找创建的 Subscription NFT
           const subscriptionNft = result.effects?.created?.find(
             (item) => (item.owner as any)?.AddressOwner === currentAccount?.address,
           );
           
           if (subscriptionNft) {
-            alert(`Successfully subscribed! Your subscription NFT ID: ${subscriptionNft.reference.objectId}`);
-            loadSubscriptionSurveys(); // 刷新列表
+            const subscriptionId = subscriptionNft.reference.objectId;
+            
+            // 显示成功提示并跳转
+            showSuccessModal(
+              `✅ Successfully subscribed to "${service.title}"!\n\nRedirecting to access survey data...`,
+              () => {
+                navigate(`/app/subscription-decrypt/${service.surveyId}`, { 
+                  state: { 
+                    subscriptionId,
+                    returnPath: '/app/subscriptions'
+                  } 
+                });
+              }
+            );
           }
         },
         onError: (error) => {
           console.error('Error purchasing subscription:', error);
-          alert(`Failed to purchase subscription: ${error.message}`);
+          showErrorModal('Failed to purchase subscription', error.message);
         },
         onSettled: () => {
           setPurchasing(null);
@@ -323,19 +373,16 @@ export function BrowseSubscriptions() {
   useEffect(() => {
     let filtered = [...services];
     
-    // 类别筛选
     if (filterCategory !== 'all') {
       filtered = filtered.filter(s => s.category === filterCategory);
     }
     
-    // 状态筛选
     if (filterStatus === 'subscribed') {
       filtered = filtered.filter(s => s.isSubscribed);
     } else if (filterStatus === 'available') {
       filtered = filtered.filter(s => !s.isSubscribed);
     }
     
-    // 搜索筛选
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(s => 
@@ -345,11 +392,23 @@ export function BrowseSubscriptions() {
       );
     }
     
+    // 排序
+    switch (sortBy) {
+      case 'newest':
+        filtered.sort((a, b) => parseInt(b.createdAt) - parseInt(a.createdAt));
+        break;
+      case 'revenue':
+        filtered.sort((a, b) => b.totalRevenue - a.totalRevenue);
+        break;
+      case 'price':
+        filtered.sort((a, b) => a.price - b.price);
+        break;
+    }
+    
     setFilteredServices(filtered);
     setCurrentPage(1);
-  }, [searchTerm, filterStatus, filterCategory, services]);
+  }, [searchTerm, filterStatus, filterCategory, sortBy, services]);
 
-  // 初始加载
   useEffect(() => {
     loadSubscriptionSurveys();
   }, [currentAccount?.address]);
@@ -389,60 +448,190 @@ export function BrowseSubscriptions() {
     return `${hours}h remaining`;
   };
 
+  const tabStats = {
+    all: services.length,
+    available: services.filter(s => !s.isSubscribed).length,
+    subscribed: services.filter(s => s.isSubscribed).length,
+  };
+
   return (
-    <Flex direction="column" gap="3">
-      {/* Header with Stats */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="center">
-            <div>
-              <Text size="5" weight="bold">Subscription Marketplace</Text>
-              <Flex gap="4" mt="2">
-                <Text size="2" color="gray">
-                  Total: <Text weight="bold">{stats.totalServices}</Text>
-                </Text>
-                <Text size="2" color="gray">
-                  Subscribed: <Text weight="bold" color="green">{stats.subscribedCount}</Text>
-                </Text>
-                <Text size="2" color="gray">
-                  Available: <Text weight="bold" color="blue">{stats.availableCount}</Text>
-                </Text>
-                <Text size="2" color="gray">
-                  Total Revenue: <Text weight="bold">{formatSUI(stats.totalRevenue)} SUI</Text>
-                </Text>
-              </Flex>
-            </div>
-            <Button onClick={loadSubscriptionSurveys} variant="soft" disabled={loading}>
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Loading...' : 'Refresh'}
-            </Button>
-          </Flex>
-        </Flex>
-      </Card>
+    <div className="bs-container">
+      {/* Header */}
+      <div className="bs-header">
+        <div className="bs-header-content">
+          <div className="bs-header-info">
+            <h1 className="bs-title">
+              <ShoppingCart size={32} style={{ marginRight: '12px', verticalAlign: 'middle' }} />
+              Subscription Marketplace
+            </h1>
+            <p className="bs-subtitle">
+              Access exclusive survey data with subscription plans
+            </p>
+          </div>
+          <button 
+            className="bs-refresh-btn" 
+            onClick={loadSubscriptionSurveys} 
+            disabled={loading}
+          >
+            <RefreshCw size={16} className={loading ? 'bs-spinning' : ''} />
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+        </div>
+
+        {/* 特色推荐卡片 */}
+        <div className="bs-featured-cards">
+          {loading ? (
+            <>
+              <div className="bs-featured-card hot skeleton">
+                <div className="bs-featured-skeleton-icon"></div>
+                <div className="bs-featured-skeleton-content">
+                  <div className="bs-featured-skeleton-label"></div>
+                  <div className="bs-featured-skeleton-title"></div>
+                  <div className="bs-featured-skeleton-value"></div>
+                </div>
+              </div>
+              <div className="bs-featured-card new skeleton">
+                <div className="bs-featured-skeleton-icon"></div>
+                <div className="bs-featured-skeleton-content">
+                  <div className="bs-featured-skeleton-label"></div>
+                  <div className="bs-featured-skeleton-title"></div>
+                  <div className="bs-featured-skeleton-value"></div>
+                </div>
+              </div>
+              <div className="bs-featured-card affordable skeleton">
+                <div className="bs-featured-skeleton-icon"></div>
+                <div className="bs-featured-skeleton-content">
+                  <div className="bs-featured-skeleton-label"></div>
+                  <div className="bs-featured-skeleton-title"></div>
+                  <div className="bs-featured-skeleton-value"></div>
+                </div>
+              </div>
+            </>
+          ) : services.length > 0 ? (
+            <>
+              <div className="bs-featured-card hot">
+                <div className="bs-featured-icon">
+                  <Zap size={20} />
+                </div>
+                <div className="bs-featured-content">
+                  <span className="bs-featured-label">🔥 Most Popular</span>
+                  <span className="bs-featured-title">
+                    {stats.hottest?.title || 'No surveys yet'}
+                  </span>
+                  <span className="bs-featured-value">
+                    {stats.hottest ? `${stats.hottest.subscriberCount} subscribers` : 'No data'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="bs-featured-card new">
+                <div className="bs-featured-icon">
+                  <Star size={20} />
+                </div>
+                <div className="bs-featured-content">
+                  <span className="bs-featured-label">✨ Newest</span>
+                  <span className="bs-featured-title">
+                    {stats.newest?.title || 'No surveys yet'}
+                  </span>
+                  <span className="bs-featured-value">
+                    {stats.newest ? formatDate(stats.newest.createdAt) : 'No data'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="bs-featured-card affordable">
+                <div className="bs-featured-icon">
+                  <Award size={20} />
+                </div>
+                <div className="bs-featured-content">
+                  <span className="bs-featured-label">💎 Best Value</span>
+                  <span className="bs-featured-title">
+                    {stats.mostAffordable?.title || 'No surveys yet'}
+                  </span>
+                  <span className="bs-featured-value">
+                    {stats.mostAffordable ? `${formatSUI(stats.mostAffordable.price)} SUI` : 'No data'}
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bs-featured-card hot" style={{ opacity: 0.5 }}>
+                <div className="bs-featured-icon">
+                  <Zap size={20} />
+                </div>
+                <div className="bs-featured-content">
+                  <span className="bs-featured-label">🔥 Most Popular</span>
+                  <span className="bs-featured-title">No surveys available</span>
+                  <span className="bs-featured-value">Check back later</span>
+                </div>
+              </div>
+              <div className="bs-featured-card new" style={{ opacity: 0.5 }}>
+                <div className="bs-featured-icon">
+                  <Star size={20} />
+                </div>
+                <div className="bs-featured-content">
+                  <span className="bs-featured-label">✨ Newest</span>
+                  <span className="bs-featured-title">No surveys available</span>
+                  <span className="bs-featured-value">Check back later</span>
+                </div>
+              </div>
+              <div className="bs-featured-card affordable" style={{ opacity: 0.5 }}>
+                <div className="bs-featured-icon">
+                  <Award size={20} />
+                </div>
+                <div className="bs-featured-content">
+                  <span className="bs-featured-label">💎 Best Value</span>
+                  <span className="bs-featured-title">No surveys available</span>
+                  <span className="bs-featured-value">Check back later</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="bs-tabs">
+        <button 
+          className={`bs-tab ${filterStatus === 'all' ? 'active' : ''}`}
+          onClick={() => setFilterStatus('all')}
+        >
+          All Services ({tabStats.all})
+        </button>
+        <button 
+          className={`bs-tab ${filterStatus === 'available' ? 'active' : ''}`}
+          onClick={() => setFilterStatus('available')}
+        >
+          Available ({tabStats.available})
+        </button>
+        {currentAccount && (
+          <button 
+            className={`bs-tab ${filterStatus === 'subscribed' ? 'active' : ''}`}
+            onClick={() => setFilterStatus('subscribed')}
+          >
+            My Subscriptions ({tabStats.subscribed})
+          </button>
+        )}
+      </div>
 
       {/* Filters */}
-      <Card>
-        <Flex gap="3" align="center" wrap="wrap">
-          <Flex align="center" gap="2">
-            <Filter size={16} />
-            <Text size="2">Filters:</Text>
-          </Flex>
-          
-          <TextField.Root
-            placeholder="Search surveys..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '200px' }}
-          >
-            <TextField.Slot>
-              <Search size={16} />
-            </TextField.Slot>
-          </TextField.Root>
+      <div className="bs-filters">
+        <div className="bs-filters-content">
+          <div className="bs-search-box">
+            <Search size={16} />
+            <input
+              className="bs-search-input"
+              placeholder="Search surveys..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           
           <select 
+            className="bs-select"
             value={filterCategory} 
             onChange={(e) => setFilterCategory(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--gray-6)' }}
           >
             {categories.map(cat => (
               <option key={cat} value={cat}>
@@ -452,208 +641,211 @@ export function BrowseSubscriptions() {
           </select>
           
           <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--gray-6)' }}
+            className="bs-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
           >
-            <option value="all">All Services</option>
-            <option value="subscribed">My Subscriptions</option>
-            <option value="available">Available to Subscribe</option>
+            <option value="newest">Newest First</option>
+            <option value="revenue">Highest Revenue</option>
+            <option value="price">Lowest Price</option>
           </select>
-          
-          <select
-            value={itemsPerPage}
-            onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--gray-6)' }}
-          >
-            <option value="6">6 per page</option>
-            <option value="12">12 per page</option>
-            <option value="24">24 per page</option>
-          </select>
-        </Flex>
-      </Card>
+        </div>
+      </div>
 
-      {/* Services Grid */}
-      {loading ? (
-        <Card>
-          <Text align="center" size="3">Loading subscription services...</Text>
-        </Card>
-      ) : currentServices.length === 0 ? (
-        <Card>
-          <Text align="center" size="3" color="gray">
-            {filteredServices.length === 0 
-              ? 'No subscription services found'
-              : 'No services on this page'}
-          </Text>
-        </Card>
-      ) : (
-        <Grid columns={{ initial: '1', sm: '2', md: '3' }} gap="3">
-          {currentServices.map((service) => (
-            <Card key={service.subscriptionServiceId}>
-              <Flex direction="column" gap="3">
-                {/* Header */}
+      {/* Table Header */}
+      {!loading && currentServices.length > 0 && (
+        <div className="bs-table-header">
+          <div>Survey</div>
+          <div>Category</div>
+          <div>Price</div>
+          <div>Duration</div>
+          <div>Subscribers</div>
+          <div>Responses</div>
+          <div>Action</div>
+        </div>
+      )}
+
+      {/* Services List */}
+      <div className="bs-survey-list">
+        {loading ? (
+          <div className="bs-loading-state">
+            <div className="bs-table-header" style={{ opacity: 0.5 }}>
+              <div>Survey</div>
+              <div>Category</div>
+              <div>Price</div>
+              <div>Duration</div>
+              <div>Subscribers</div>
+              <div>Responses</div>
+              <div>Action</div>
+            </div>
+            
+            {[...Array(6)].map((_, index) => (
+              <div key={index} className="bs-skeleton-row" style={{ animationDelay: `${index * 0.1}s` }}>
+                <div className="bs-survey-info">
+                  <div className="bs-skeleton bs-skeleton-title"></div>
+                  <div className="bs-skeleton bs-skeleton-desc"></div>
+                  <div className="bs-skeleton bs-skeleton-meta"></div>
+                </div>
                 <div>
-                  <Flex justify="between" align="start" mb="2">
-                    <Badge variant="soft">{service.category}</Badge>
-                    {service.isSubscribed && (
-                      <Badge color="green" variant="soft">
-                        <CheckCircle size={12} />
-                        Subscribed
-                      </Badge>
-                    )}
-                  </Flex>
-                  <Text 
-                    size="3" 
-                    weight="bold" 
-                    style={{ cursor: 'pointer' }}
+                  <div className="bs-skeleton bs-skeleton-badge"></div>
+                </div>
+                <div>
+                  <div className="bs-skeleton bs-skeleton-price"></div>
+                </div>
+                <div>
+                  <div className="bs-skeleton bs-skeleton-duration"></div>
+                </div>
+                <div>
+                  <div className="bs-skeleton bs-skeleton-users"></div>
+                </div>
+                <div>
+                  <div className="bs-skeleton bs-skeleton-progress"></div>
+                </div>
+                <div>
+                  <div className="bs-skeleton bs-skeleton-btn"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : currentServices.length === 0 ? (
+          <div className="bs-empty-state">
+            <BarChart size={48} />
+            <h3 className="bs-empty-title">
+              {filteredServices.length === 0 
+                ? 'No subscription services found'
+                : 'No services on this page'}
+            </h3>
+            <p className="bs-empty-desc">
+              {filterStatus === 'subscribed'
+                ? 'Browse available services and subscribe to access survey data'
+                : 'Try adjusting your filters or check back later'}
+            </p>
+          </div>
+        ) : (
+          currentServices.map((service) => {
+            const progress = Math.min(100, (service.currentResponses / service.maxResponses) * 100);
+            
+            return (
+              <div key={service.subscriptionServiceId} className="bs-survey-row">
+                <div className="bs-survey-info">
+                  <h3 
+                    className="bs-survey-title"
                     onClick={() => viewSurveyDetails(service.surveyId)}
                   >
                     {service.title}
-                  </Text>
-                  <Text size="2" color="gray" style={{ 
-                    marginTop: '4px',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {service.description}
-                  </Text>
-                </div>
-
-                {/* Info Cards */}
-                <Flex direction="column" gap="2">
-                  <Flex gap="2">
-                    <Card style={{ flex: 1, backgroundColor: 'var(--purple-1)' }}>
-                      <Flex direction="column" gap="1">
-                        <Flex align="center" gap="1">
-                          <DollarSign size={12} />
-                          <Text size="1" color="gray">Price</Text>
-                        </Flex>
-                        <Text size="2" weight="bold">{formatSUI(service.price)} SUI</Text>
-                      </Flex>
-                    </Card>
-                    
-                    <Card style={{ flex: 1, backgroundColor: 'var(--blue-1)' }}>
-                      <Flex direction="column" gap="1">
-                        <Flex align="center" gap="1">
-                          <Clock size={12} />
-                          <Text size="1" color="gray">Duration</Text>
-                        </Flex>
-                        <Text size="2" weight="bold">{formatDuration(service.duration)}</Text>
-                      </Flex>
-                    </Card>
-                  </Flex>
-                  
-                  <Flex gap="2">
-                    <Card style={{ flex: 1, backgroundColor: 'var(--green-1)' }}>
-                      <Flex direction="column" gap="1">
-                        <Flex align="center" gap="1">
-                          <Users size={12} />
-                          <Text size="1" color="gray">Subscribers</Text>
-                        </Flex>
-                        <Text size="2" weight="bold">{service.subscriberCount}</Text>
-                      </Flex>
-                    </Card>
-                    
-                    <Card style={{ flex: 1, backgroundColor: 'var(--orange-1)' }}>
-                      <Flex direction="column" gap="1">
-                        <Flex align="center" gap="1">
-                          <TrendingUp size={12} />
-                          <Text size="1" color="gray">Responses</Text>
-                        </Flex>
-                        <Text size="2" weight="bold">
-                          {service.currentResponses}/{service.maxResponses}
-                        </Text>
-                      </Flex>
-                    </Card>
-                  </Flex>
-                </Flex>
-
-                {/* Additional Info */}
-                <Flex direction="column" gap="1">
-                  <Flex justify="between">
-                    <Text size="1" color="gray">Created:</Text>
-                    <Text size="1">{formatDate(service.createdAt)}</Text>
-                  </Flex>
-                  {service.totalRevenue > 0 && (
-                    <Flex justify="between">
-                      <Text size="1" color="gray">Total Revenue:</Text>
-                      <Text size="1" weight="bold">{formatSUI(service.totalRevenue)} SUI</Text>
-                    </Flex>
-                  )}
-                  <Flex justify="between">
-                    <Text size="1" color="gray">Status:</Text>
-                    <Badge size="1" color={service.isActive ? 'green' : 'gray'}>
+                    {service.isSubscribed && (
+                      <span className="bs-subscribed-indicator">
+                        <CheckCircle size={14} />
+                      </span>
+                    )}
+                  </h3>
+                  <p className="bs-survey-desc">{service.description}</p>
+                  <div className="bs-survey-meta">
+                    <span className="bs-meta-tag">
+                      <Calendar size={12} />
+                      {formatDate(service.createdAt)}
+                    </span>
+                    <span className={`bs-status-badge ${service.isActive ? 'active' : 'closed'}`}>
                       {service.isActive ? 'Active' : 'Closed'}
-                    </Badge>
-                  </Flex>
-                </Flex>
-
-                {/* Action Button */}
-                {service.isSubscribed ? (
-                  <Flex direction="column" gap="2">
-                    {service.subscriptionExpiry && (
-                      <Card style={{ backgroundColor: 'var(--green-2)' }}>
-                        <Text size="2" align="center" color="green" weight="bold">
+                    </span>
+                    {service.totalRevenue > 0 && (
+                      <span className="bs-meta-tag">
+                        <TrendingUp size={12} />
+                        {formatSUI(service.totalRevenue)} SUI revenue
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="bs-category">
+                  <span className="bs-category-badge">{service.category}</span>
+                </div>
+                
+                <div className="bs-price">
+                  <DollarSign size={14} />
+                  {formatSUI(service.price)}
+                  <span className="bs-price-unit">SUI</span>
+                </div>
+                
+                <div className="bs-duration">
+                  <Clock size={14} />
+                  {formatDuration(service.duration)}
+                </div>
+                
+                <div className="bs-subscribers">
+                  <Users size={14} />
+                  {service.subscriberCount}
+                </div>
+                
+                <div className="bs-responses">
+                  <div className="bs-response-progress">
+                    <span>{service.currentResponses}/{service.maxResponses}</span>
+                    <div className="bs-progress-bar">
+                      <div className="bs-progress-fill" style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bs-actions">
+                  {service.isSubscribed ? (
+                    <div className="bs-subscribed-actions">
+                      {service.subscriptionExpiry && (
+                        <div className="bs-expiry">
                           {formatExpiry(service.subscriptionExpiry)}
-                        </Text>
-                      </Card>
-                    )}
-                    <Button 
-                      size="2" 
-                      variant="soft"
-                      onClick={() => viewSubscriptionAnswers(service.surveyId, service.userSubscriptionId)}
+                        </div>
+                      )}
+                      <button 
+                        className="bs-action-btn secondary"
+                        onClick={() => viewSubscriptionAnswers(service.surveyId, service.userSubscriptionId)}
+                      >
+                        <Eye size={14} />
+                        View Answers
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="bs-action-btn primary"
+                      onClick={() => purchaseSubscription(service)}
+                      disabled={purchasing === service.subscriptionServiceId}
                     >
-                      <Eye size={16} />
-                      View Survey Answers
-                    </Button>
-                  </Flex>
-                ) : (
-                  <Button
-                    size="2"
-                    onClick={() => purchaseSubscription(service)}
-                    disabled={purchasing === service.subscriptionServiceId}
-                  >
-                    {purchasing === service.subscriptionServiceId ? (
-                      <>
-                        <RefreshCw size={16} className="animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart size={16} />
-                        Subscribe for {formatSUI(service.price)} SUI
-                      </>
-                    )}
-                  </Button>
-                )}
-              </Flex>
-            </Card>
-          ))}
-        </Grid>
-      )}
+                      {purchasing === service.subscriptionServiceId ? (
+                        <>
+                          <RefreshCw size={14} className="bs-spinning" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart size={14} />
+                          Subscribe
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Card>
-          <Flex justify="between" align="center">
-            <Text size="2" color="gray">
+        <div className="bs-pagination">
+          <div className="bs-pagination-content">
+            <span className="bs-page-info">
               Showing {startIndex + 1}-{Math.min(endIndex, filteredServices.length)} of {filteredServices.length} services
-            </Text>
+            </span>
             
-            <Flex gap="2" align="center">
-              <Button 
-                size="2" 
-                variant="soft"
+            <div className="bs-page-controls">
+              <button 
+                className="bs-page-btn"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
               >
                 <ChevronLeft size={16} />
-              </Button>
+              </button>
               
-              <Flex gap="1">
+              <div className="bs-page-numbers">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {
@@ -667,31 +859,29 @@ export function BrowseSubscriptions() {
                   }
                   
                   return (
-                    <Button
+                    <button
                       key={i}
-                      size="2"
-                      variant={pageNum === currentPage ? 'solid' : 'soft'}
+                      className={`bs-page-btn ${pageNum === currentPage ? 'active' : ''}`}
                       onClick={() => setCurrentPage(pageNum)}
                     >
                       {pageNum}
-                    </Button>
+                    </button>
                   );
                 })}
-              </Flex>
+              </div>
               
-              <Button 
-                size="2" 
-                variant="soft"
+              <button 
+                className="bs-page-btn"
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
               >
                 <ChevronRight size={16} />
-              </Button>
-            </Flex>
-          </Flex>
-        </Card>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </Flex>
+    </div>
   );
 }
 

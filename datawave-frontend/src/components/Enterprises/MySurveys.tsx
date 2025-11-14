@@ -1,9 +1,7 @@
-// My Surveys Management Component with Subscription Services
-// 改进版本：使用更可靠的获取问卷方式
-
+// src/components/Enterprise/MySurveys.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, Flex, Text, Badge, Button, Tabs } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
 import { 
   FileText, 
@@ -19,8 +17,18 @@ import {
   DollarSign,
   Gift,
   TrendingUp,
-  Clock
+  Clock,
+  Plus,
+  BarChart,
+  Package,
+  Wallet,
+  AlertCircle,
+  Shield,
+  X,
+  Hash,
+  ChevronRight
 } from 'lucide-react';
+import './MySurveys.css';
 
 interface SurveyData {
   id: string;
@@ -49,11 +57,13 @@ interface SurveyData {
 export function MySurveys() {
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
+  const navigate = useNavigate();
   const packageId = ConfigService.getPackageId();
   
   const [mySurveys, setMySurveys] = useState<SurveyData[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('active');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
   
   const [stats, setStats] = useState({
     totalSurveys: 0,
@@ -66,7 +76,41 @@ export function MySurveys() {
     totalSubscribers: 0
   });
 
-  // 获取单个问卷的详细信息
+  // Toast notifications
+  const [toasts, setToasts] = useState<Array<{
+    id: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    message: string;
+  }>>([]);
+
+  const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 3000);
+  };
+
+  // Navigation functions
+  const viewSurveyDetails = (surveyId: string) => {
+    navigate(`/app/survey/${surveyId}`);
+  };
+
+  const handleManageSurvey = (surveyId: string) => {
+    navigate(`/app/manage/${surveyId}`);
+  };
+
+  const createNewSurvey = () => {
+    navigate('/app/create-survey');
+  };
+
+  const shareSubscriptionLink = (serviceId: string) => {
+    const link = `${window.location.origin}/app/subscriptions/${serviceId}`;
+    navigator.clipboard.writeText(link);
+    showToast('success', 'Subscription link copied to clipboard!');
+  };
+
+  // Fetch survey details
   const fetchSurveyDetails = async (surveyId: string): Promise<SurveyData | null> => {
     try {
       const surveyObj = await suiClient.getObject({
@@ -77,16 +121,13 @@ export function MySurveys() {
         }
       });
 
-      // 验证是 Survey 类型
       if (!surveyObj.data?.type?.includes('::survey_system::Survey')) {
-        console.log(`Object ${surveyId} is not a Survey`);
         return null;
       }
 
       if (surveyObj.data?.content && 'fields' in surveyObj.data.content) {
         const fields = surveyObj.data.content.fields as any;
         
-        // 解析问题
         const questions = fields.questions?.map((q: any) => ({
           question_text: q.fields?.question_text || q.question_text || '',
           question_type: parseInt(q.fields?.question_type || q.question_type || '0'),
@@ -108,7 +149,6 @@ export function MySurveys() {
           subscriptionServiceId: fields.subscription_service_id
         };
 
-        // 如果有订阅服务ID，获取详情
         if (surveyData.subscriptionServiceId) {
           try {
             const serviceObj = await suiClient.getObject({
@@ -119,7 +159,6 @@ export function MySurveys() {
             if (serviceObj.data?.content && 'fields' in serviceObj.data.content) {
               const serviceFields = serviceObj.data.content.fields as any;
               
-              // 获取订阅者数量
               const subscriptionEvents = await suiClient.queryEvents({
                 query: {
                   MoveEventType: `${packageId}::survey_system::SubscriptionPurchased`,
@@ -153,16 +192,15 @@ export function MySurveys() {
     return null;
   };
 
-  // 加载用户的所有问卷
+  // Load user's surveys
   const loadMySurveys = async () => {
     if (!currentAccount?.address) return;
     
     setLoading(true);
     try {
       const allSurveys: SurveyData[] = [];
-      const surveyIdSet = new Set<string>(); // 用于去重
+      const surveyIdSet = new Set<string>();
       
-      // 方法1: 从 Registry 获取用户创建的问卷
       const registryId = ConfigService.getSurveyRegistryId();
       try {
         const registry = await suiClient.getObject({
@@ -174,13 +212,10 @@ export function MySurveys() {
 
         if (registry.data?.content && 'fields' in registry.data.content) {
           const fields = registry.data.content.fields;
-          
-          // 获取 surveys_by_creator table
           const surveysByCreatorTable = fields.surveys_by_creator?.fields?.id?.id;
           
           if (surveysByCreatorTable) {
             try {
-              // 获取该用户的问卷列表
               const creatorField = await suiClient.getDynamicFieldObject({
                 parentId: surveysByCreatorTable,
                 name: {
@@ -191,9 +226,7 @@ export function MySurveys() {
               
               if (creatorField.data?.content && 'fields' in creatorField.data.content) {
                 const surveyIds = creatorField.data.content.fields.value || [];
-                console.log(`Found ${surveyIds.length} surveys for user from registry`);
                 
-                // 批量获取问卷详情
                 for (const surveyId of surveyIds) {
                   if (!surveyIdSet.has(surveyId)) {
                     surveyIdSet.add(surveyId);
@@ -208,57 +241,11 @@ export function MySurveys() {
               console.log('No surveys found for user in registry');
             }
           }
-          
-          // 也可以遍历 all_surveys table 来查找（备用方案）
-          const allSurveysTable = fields.all_surveys?.fields?.id?.id;
-          if (allSurveysTable && allSurveys.length === 0) {
-            let hasNextPage = true;
-            let cursor = null;
-            
-            while (hasNextPage) {
-              const dynamicFields = await suiClient.getDynamicFields({
-                parentId: allSurveysTable,
-                cursor,
-                limit: 50,
-              });
-              
-              for (const field of dynamicFields.data) {
-                const surveyId = field.name.value as string;
-                
-                if (!surveyIdSet.has(surveyId)) {
-                  // 获取基本信息先检查 creator
-                  try {
-                    const fieldObject = await suiClient.getDynamicFieldObject({
-                      parentId: allSurveysTable,
-                      name: field.name,
-                    });
-                    
-                    if (fieldObject.data?.content && 'fields' in fieldObject.data.content) {
-                      const basicInfo = fieldObject.data.content.fields.value?.fields;
-                      if (basicInfo?.creator === currentAccount.address) {
-                        surveyIdSet.add(surveyId);
-                        const surveyData = await fetchSurveyDetails(surveyId);
-                        if (surveyData) {
-                          allSurveys.push(surveyData);
-                        }
-                      }
-                    }
-                  } catch (err) {
-                    console.error(`Error checking survey ${surveyId}:`, err);
-                  }
-                }
-              }
-              
-              hasNextPage = dynamicFields.hasNextPage;
-              cursor = dynamicFields.nextCursor;
-            }
-          }
         }
       } catch (error) {
         console.error('Error fetching from registry:', error);
       }
       
-      // 方法2: 查找用户拥有的 SurveyCap 对象并关联
       try {
         const capObjects = await suiClient.getOwnedObjects({
           owner: currentAccount.address,
@@ -268,20 +255,16 @@ export function MySurveys() {
           options: { showContent: true, showType: true }
         });
         
-        console.log('Found SurveyCaps:', capObjects.data.length);
-        
         for (const cap of capObjects.data) {
           if (cap.data?.content && 'fields' in cap.data.content) {
             const capFields = cap.data.content.fields as any;
             const surveyId = capFields.survey_id;
             const capId = cap.data.objectId;
             
-            // 查找对应的survey并更新capId
             const existingSurvey = allSurveys.find(s => s.id === surveyId);
             if (existingSurvey) {
               existingSurvey.capId = capId;
             } else if (!surveyIdSet.has(surveyId)) {
-              // 如果还没有这个survey，尝试获取
               const surveyData = await fetchSurveyDetails(surveyId);
               if (surveyData && surveyData.creator === currentAccount.address) {
                 surveyData.capId = capId;
@@ -295,15 +278,26 @@ export function MySurveys() {
         console.error('Error fetching SurveyCaps:', error);
       }
       
-      // 按创建时间排序
       allSurveys.sort((a, b) => {
         return parseInt(b.createdAt || '0') - parseInt(a.createdAt || '0');
       });
       
       setMySurveys(allSurveys);
       
-      // 计算统计
-      const activeSurveys = allSurveys.filter(s => s.isActive).length;
+      // Calculate stats
+      const completedSurveys = allSurveys.filter(s => {
+        const current = parseInt(s.currentResponses || '0');
+        const max = parseInt(s.maxResponses || '0');
+        return max > 0 && current >= max;
+      }).length;
+      
+      const trulyActiveSurveys = allSurveys.filter(s => {
+        const current = parseInt(s.currentResponses || '0');
+        const max = parseInt(s.maxResponses || '0');
+        const isCompleted = max > 0 && current >= max;
+        return !isCompleted && s.isActive;
+      }).length;
+      
       const totalResponses = allSurveys.reduce((sum, s) => 
         sum + parseInt(s.currentResponses || '0'), 0
       );
@@ -311,7 +305,7 @@ export function MySurveys() {
         sum + (parseInt(s.currentResponses || '0') * parseInt(s.rewardPerResponse || '0')), 0
       );
       const totalRewardsRemaining = allSurveys.reduce((sum, s) => {
-        const remaining = parseInt(s.maxResponses || '0') - parseInt(s.currentResponses || '0');
+        const remaining = Math.max(0, parseInt(s.maxResponses || '0') - parseInt(s.currentResponses || '0'));
         return sum + (remaining * parseInt(s.rewardPerResponse || '0'));
       }, 0);
       
@@ -325,7 +319,7 @@ export function MySurveys() {
       
       setStats({
         totalSurveys: allSurveys.length,
-        activeSurveys,
+        activeSurveys: trulyActiveSurveys,
         totalResponses,
         totalRewardsDistributed,
         totalRewardsRemaining,
@@ -334,16 +328,28 @@ export function MySurveys() {
         totalSubscribers
       });
       
+      if (!loading) {
+        showToast('success', `Loaded ${allSurveys.length} surveys`);
+      }
     } catch (error) {
       console.error('Error loading surveys:', error);
+      showToast('error', 'Failed to load surveys');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadMySurveys();
   };
 
   useEffect(() => {
     if (currentAccount?.address) {
       loadMySurveys();
+    } else {
+      setLoading(false);
     }
   }, [currentAccount?.address]);
 
@@ -354,13 +360,13 @@ export function MySurveys() {
 
   const formatDate = (timestamp: string) => {
     const date = new Date(parseInt(timestamp));
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    return date.toLocaleDateString();
   };
 
   const formatDuration = (ms: number) => {
     const hours = ms / (1000 * 60 * 60);
-    if (hours < 24) return `${hours} hours`;
-    return `${Math.floor(hours / 24)} days`;
+    if (hours < 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
   };
 
   const getCompletionRate = (current: string, max: string) => {
@@ -370,272 +376,343 @@ export function MySurveys() {
     return (curr / maximum) * 100;
   };
 
-  const shareSubscriptionLink = (serviceId: string) => {
-    const link = `${window.location.origin}/subscription/${serviceId}`;
-    navigator.clipboard.writeText(link);
-    alert(`Subscription link copied:\n${link}`);
-  };
-
-  const handleManageSurvey = (surveyId: string) => {
-    const event = new CustomEvent('manageSurvey', { 
-      detail: { surveyId } 
-    });
-    window.dispatchEvent(event);
+  const isSurveyCompleted = (survey: SurveyData) => {
+    const current = parseInt(survey.currentResponses || '0');
+    const max = parseInt(survey.maxResponses || '0');
+    return max > 0 && current >= max;
   };
 
   const filteredSurveys = mySurveys.filter(survey => {
-    if (activeTab === 'active') return survey.isActive;
-    if (activeTab === 'completed') return !survey.isActive;
+    const isCompleted = isSurveyCompleted(survey);
+    if (activeTab === 'active') return !isCompleted && survey.isActive;
+    if (activeTab === 'completed') return isCompleted || !survey.isActive;
     if (activeTab === 'subscription') return survey.hasSubscription;
     return true;
   });
 
+  // Skeleton Card Component
+  const SkeletonCard = () => (
+    <div className="mys-skeleton-card">
+      <div className="mys-skeleton-header">
+        <div className="mys-skeleton-badge"></div>
+        <div className="mys-skeleton-badges"></div>
+      </div>
+      <div className="mys-skeleton-title"></div>
+      <div className="mys-skeleton-description"></div>
+      <div className="mys-skeleton-stats">
+        <div className="mys-skeleton-stat"></div>
+        <div className="mys-skeleton-stat"></div>
+        <div className="mys-skeleton-stat"></div>
+      </div>
+      <div className="mys-skeleton-progress"></div>
+      <div className="mys-skeleton-actions">
+        <div className="mys-skeleton-button"></div>
+        <div className="mys-skeleton-button"></div>
+      </div>
+    </div>
+  );
+
   if (!currentAccount) {
     return (
-      <Card>
-        <Flex direction="column" align="center" gap="3" py="5">
-          <Text size="4" weight="bold">Connect Wallet</Text>
-          <Text size="2" color="gray">Please connect your wallet to view your surveys</Text>
-        </Flex>
-      </Card>
+      <div className="mys-container">
+        <div className="mys-connect-wallet">
+          <Wallet size={48} />
+          <h2>Connect Your Wallet</h2>
+          <p>Please connect your wallet to view and manage your surveys</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Flex direction="column" gap="3">
-      {/* Header with Stats */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="center">
-            <Text size="5" weight="bold">My Surveys & Subscriptions</Text>
-            <Button onClick={loadMySurveys} variant="soft" disabled={loading}>
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Loading...' : 'Refresh'}
-            </Button>
-          </Flex>
+    <div className="mys-container">
+      {/* Header */}
+      <div className="mys-header">
+        <div className="mys-header-content">
+          <div className="mys-header-info">
+            <h1 className="mys-title">My Surveys</h1>
+            <p className="mys-subtitle">Manage your surveys and subscription services</p>
+          </div>
+          <div className="mys-header-actions">
+            <button className="mys-btn primary" onClick={createNewSurvey}>
+              <Plus size={16} />
+              Create Survey
+            </button>
+            <button 
+              className="mys-btn secondary" 
+              onClick={handleRefresh} 
+              disabled={refreshing}
+            >
+              <RefreshCw size={16} className={refreshing ? 'mys-spinning' : ''} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
+        
+        {/* Stats */}
+        <div className="mys-stats-grid">
+          <div className="mys-stat-card">
+            <div className="mys-stat-icon blue">
+              <Package size={20} />
+            </div>
+            <div className="mys-stat-content">
+              <div className="mys-stat-label">Total Surveys</div>
+              <div className="mys-stat-value">{stats.totalSurveys}</div>
+            </div>
+          </div>
           
-          <Flex gap="3" wrap="wrap">
-            <Card style={{ flex: '1', minWidth: '150px', backgroundColor: 'var(--blue-2)' }}>
-              <Flex direction="column" gap="1">
-                <Text size="1" color="gray">Total Surveys</Text>
-                <Text size="4" weight="bold">{stats.totalSurveys}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ flex: '1', minWidth: '150px', backgroundColor: 'var(--green-2)' }}>
-              <Flex direction="column" gap="1">
-                <Text size="1" color="gray">Active</Text>
-                <Text size="4" weight="bold" color="green">{stats.activeSurveys}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ flex: '1', minWidth: '150px', backgroundColor: 'var(--purple-2)' }}>
-              <Flex direction="column" gap="1">
-                <Text size="1" color="gray">With Subscription</Text>
-                <Text size="4" weight="bold">{stats.surveysWithSubscription}</Text>
-              </Flex>
-            </Card>
-            
-            <Card style={{ flex: '1', minWidth: '150px', backgroundColor: 'var(--cyan-2)' }}>
-              <Flex direction="column" gap="1">
-                <Text size="1" color="gray">Subscription Revenue</Text>
-                <Text size="3" weight="bold">{formatSUI(stats.totalSubscriptionRevenue)} SUI</Text>
-              </Flex>
-            </Card>
-          </Flex>
-        </Flex>
-      </Card>
+          <div className="mys-stat-card">
+            <div className="mys-stat-icon green">
+              <CheckCircle size={20} />
+            </div>
+            <div className="mys-stat-content">
+              <div className="mys-stat-label">Active</div>
+              <div className="mys-stat-value">{stats.activeSurveys}</div>
+            </div>
+          </div>
+          
+          <div className="mys-stat-card">
+            <div className="mys-stat-icon purple">
+              <Gift size={20} />
+            </div>
+            <div className="mys-stat-content">
+              <div className="mys-stat-label">With Subscription</div>
+              <div className="mys-stat-value">{stats.surveysWithSubscription}</div>
+            </div>
+          </div>
+          
+          <div className="mys-stat-card">
+            <div className="mys-stat-icon cyan">
+              <TrendingUp size={20} />
+            </div>
+            <div className="mys-stat-content">
+              <div className="mys-stat-label">Subscription Revenue</div>
+              <div className="mys-stat-value">{formatSUI(stats.totalSubscriptionRevenue)} SUI</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Tabs */}
-      <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-        <Tabs.List>
-          <Tabs.Trigger value="all">All ({mySurveys.length})</Tabs.Trigger>
-          <Tabs.Trigger value="active">Active ({mySurveys.filter(s => s.isActive).length})</Tabs.Trigger>
-          <Tabs.Trigger value="completed">Completed ({mySurveys.filter(s => !s.isActive).length})</Tabs.Trigger>
-          <Tabs.Trigger value="subscription">
-            With Subscription ({mySurveys.filter(s => s.hasSubscription).length})
-          </Tabs.Trigger>
-        </Tabs.List>
-      </Tabs.Root>
+      <div className="mys-tabs-section">
+        <div className="mys-tabs">
+          <button 
+            className={`mys-tab ${activeTab === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveTab('all')}
+          >
+            All
+            <span className="mys-tab-count">{mySurveys.length}</span>
+          </button>
+          <button 
+            className={`mys-tab ${activeTab === 'active' ? 'active' : ''}`}
+            onClick={() => setActiveTab('active')}
+          >
+            Active
+            <span className="mys-tab-count">
+              {mySurveys.filter(s => !isSurveyCompleted(s) && s.isActive).length}
+            </span>
+          </button>
+          <button 
+            className={`mys-tab ${activeTab === 'completed' ? 'active' : ''}`}
+            onClick={() => setActiveTab('completed')}
+          >
+            Completed
+            <span className="mys-tab-count">
+              {mySurveys.filter(s => isSurveyCompleted(s) || !s.isActive).length}
+            </span>
+          </button>
+          <button 
+            className={`mys-tab ${activeTab === 'subscription' ? 'active' : ''}`}
+            onClick={() => setActiveTab('subscription')}
+          >
+            <Gift size={14} />
+            With Subscription
+            <span className="mys-tab-count">{mySurveys.filter(s => s.hasSubscription).length}</span>
+          </button>
+        </div>
+      </div>
 
-      {/* Surveys List */}
-      {loading ? (
-        <Card>
-          <Text align="center">Loading your surveys...</Text>
-        </Card>
-      ) : filteredSurveys.length === 0 ? (
-        <Card>
-          <Flex direction="column" align="center" gap="3" py="5">
-            <Text size="3" color="gray">
+      {/* Surveys Grid */}
+      <div className="mys-surveys-section">
+        {loading ? (
+          <div className="mys-surveys-grid">
+            {[...Array(6)].map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : filteredSurveys.length === 0 ? (
+          <div className="mys-empty-state">
+            <BarChart size={48} />
+            <h3>
               {activeTab === 'active' ? 'No active surveys' : 
                activeTab === 'completed' ? 'No completed surveys' : 
                activeTab === 'subscription' ? 'No surveys with subscription' :
                'No surveys created yet'}
-            </Text>
-          </Flex>
-        </Card>
-      ) : (
-        <Flex direction="column" gap="3">
-          {filteredSurveys.map(survey => (
-            <Card key={survey.id}>
-              <Flex direction="column" gap="3">
-                <Flex justify="between" align="start">
-                  <Flex direction="column" gap="1">
-                    <Flex align="center" gap="2">
-                      <Text size="4" weight="bold">{survey.title}</Text>
-                      <Badge color={survey.isActive ? 'green' : 'gray'}>
-                        {survey.isActive ? 'Active' : 'Closed'}
-                      </Badge>
-                      <Badge variant="soft">{survey.category}</Badge>
-                      {survey.hasSubscription && (
-                        <Badge color="purple">
-                          <DollarSign size={12} />
-                          Subscription
-                        </Badge>
+            </h3>
+            {mySurveys.length === 0 && (
+              <>
+                <p>Create your first survey to start collecting responses</p>
+                <button className="mys-btn primary" onClick={createNewSurvey}>
+                  <Plus size={16} />
+                  Create Your First Survey
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="mys-surveys-grid">
+            {filteredSurveys.map(survey => (
+              <div key={survey.id} className={`mys-survey-card ${isSurveyCompleted(survey) ? 'completed' : ''}`}>
+                {/* Card Header */}
+                <div className="mys-card-header">
+                  <span className="mys-category-badge">{survey.category}</span>
+                  <div className="mys-header-badges">
+                    <span className={`mys-status-badge ${
+                      isSurveyCompleted(survey) ? 'completed' : 
+                      survey.isActive ? 'active' : 'closed'
+                    }`}>
+                      {isSurveyCompleted(survey) ? (
+                        <>
+                          <CheckCircle size={12} />
+                          Completed
+                        </>
+                      ) : survey.isActive ? (
+                        <>
+                          <Clock size={12} />
+                          Active
+                        </>
+                      ) : (
+                        <>
+                          <X size={12} />
+                          Closed
+                        </>
                       )}
-                      {!survey.capId && (
-                        <Badge color="orange" variant="soft">
-                          No Cap
-                        </Badge>
-                      )}
-                    </Flex>
-                    <Text size="2" color="gray">{survey.description}</Text>
-                  </Flex>
-                  
-                  <Flex gap="2">
-                    <Button 
-                      size="2" 
-                      variant="soft"
-                      onClick={() => {
-                        const event = new CustomEvent('viewSurveyDetails', { 
-                          detail: { surveyId: survey.id } 
-                        });
-                        window.dispatchEvent(event);
-                      }}
-                    >
-                      <Eye size={16} />
-                      View
-                    </Button>
-                    <Button 
-                      size="2" 
-                      variant="soft"
-                      color="blue"
-                      onClick={() => handleManageSurvey(survey.id)}
-                    >
-                      <Settings size={16} />
-                      Manage
-                    </Button>
-                    {survey.hasSubscription && survey.subscriptionService && (
-                      <Button 
-                        size="2" 
-                        variant="soft"
-                        color="cyan"
-                        onClick={() => shareSubscriptionLink(survey.subscriptionService!.serviceId)}
-                      >
-                        <ExternalLink size={16} />
-                        Share Link
-                      </Button>
+                    </span>
+                    {survey.hasSubscription && (
+                      <span className="mys-subscription-badge">
+                        <DollarSign size={12} />
+                      </span>
                     )}
-                  </Flex>
-                </Flex>
-
-                <Flex gap="4" wrap="wrap">
-                  <Flex align="center" gap="1">
-                    <Calendar size={14} />
-                    <Text size="2" color="gray">Created: {formatDate(survey.createdAt)}</Text>
-                  </Flex>
-                  <Flex align="center" gap="1">
-                    <FileText size={14} />
-                    <Text size="2">{survey.questions.length} Questions</Text>
-                  </Flex>
-                  <Flex align="center" gap="1">
-                    <Coins size={14} />
-                    <Text size="2">{formatSUI(survey.rewardPerResponse)} SUI/response</Text>
-                  </Flex>
-                  <Flex align="center" gap="1">
-                    <Users size={14} />
-                    <Text size="2">{survey.currentResponses}/{survey.maxResponses} Responses</Text>
-                  </Flex>
-                </Flex>
-
-                {/* Subscription Service Info */}
-                {survey.hasSubscription && survey.subscriptionService && (
-                  <Card style={{ backgroundColor: 'var(--purple-1)' }}>
-                    <Flex direction="column" gap="2">
-                      <Flex align="center" gap="2">
-                        <Gift size={16} />
-                        <Text size="2" weight="bold">Subscription Service Active</Text>
-                      </Flex>
-                      <Flex justify="between" wrap="wrap" gap="3">
-                        <Flex direction="column" gap="1">
-                          <Text size="1" color="gray">Price</Text>
-                          <Flex align="center" gap="1">
-                            <DollarSign size={12} />
-                            <Text size="2" weight="bold">
-                              {formatSUI(survey.subscriptionService.price)} SUI
-                            </Text>
-                          </Flex>
-                        </Flex>
-                        <Flex direction="column" gap="1">
-                          <Text size="1" color="gray">Duration</Text>
-                          <Flex align="center" gap="1">
-                            <Clock size={12} />
-                            <Text size="2" weight="bold">
-                              {formatDuration(survey.subscriptionService.duration)}
-                            </Text>
-                          </Flex>
-                        </Flex>
-                        <Flex direction="column" gap="1">
-                          <Text size="1" color="gray">Total Revenue</Text>
-                          <Flex align="center" gap="1">
-                            <TrendingUp size={12} />
-                            <Text size="2" weight="bold" color="green">
-                              {formatSUI(survey.subscriptionService.totalRevenue)} SUI
-                            </Text>
-                          </Flex>
-                        </Flex>
-                        <Flex direction="column" gap="1">
-                          <Text size="1" color="gray">Subscribers</Text>
-                          <Flex align="center" gap="1">
-                            <Users size={12} />
-                            <Text size="2" weight="bold">
-                              {survey.subscriptionService.subscriberCount}
-                            </Text>
-                          </Flex>
-                        </Flex>
-                      </Flex>
-                    </Flex>
-                  </Card>
-                )}
-
-                {/* Progress Bar */}
-                <div>
-                  <Flex justify="between" mb="1">
-                    <Text size="1" color="gray">Completion Progress</Text>
-                    <Text size="1" weight="bold">
-                      {getCompletionRate(survey.currentResponses, survey.maxResponses).toFixed(1)}%
-                    </Text>
-                  </Flex>
-                  <div style={{ 
-                    width: '100%', 
-                    height: '6px', 
-                    backgroundColor: 'var(--gray-4)', 
-                    borderRadius: '3px',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{ 
-                      width: `${getCompletionRate(survey.currentResponses, survey.maxResponses)}%`, 
-                      height: '100%', 
-                      backgroundColor: survey.isActive ? 'var(--blue-9)' : 'var(--green-9)',
-                      transition: 'width 0.3s ease'
-                    }} />
+                    {!survey.capId && (
+                      <span className="mys-no-cap-badge" title="SurveyCap not found">
+                        <AlertCircle size={12} />
+                      </span>
+                    )}
                   </div>
                 </div>
-              </Flex>
-            </Card>
-          ))}
-        </Flex>
-      )}
-    </Flex>
+
+                {/* Card Content */}
+                <h3 className="mys-card-title">{survey.title}</h3>
+                <p className="mys-card-description">{survey.description}</p>
+
+                {/* Survey Info */}
+                <div className="mys-card-info">
+                  <div className="mys-info-item">
+                    <Calendar size={14} />
+                    <span>{formatDate(survey.createdAt)}</span>
+                  </div>
+                  <div className="mys-info-item">
+                    <FileText size={14} />
+                    <span>{survey.questions.length} Questions</span>
+                  </div>
+                  <div className="mys-info-item">
+                    <Coins size={14} />
+                    <span>{formatSUI(survey.rewardPerResponse)} SUI/response</span>
+                  </div>
+                </div>
+
+                {/* Response Progress */}
+                <div className="mys-response-section">
+                  <div className="mys-response-header">
+                    <div className="mys-response-label">
+                      <Users size={14} />
+                      Responses
+                    </div>
+                    <div className="mys-response-count">
+                      {survey.currentResponses} / {survey.maxResponses}
+                    </div>
+                  </div>
+                  <div className="mys-progress-bar">
+                    <div 
+                      className="mys-progress-fill"
+                      style={{ width: `${Math.min(100, getCompletionRate(survey.currentResponses, survey.maxResponses))}%` }}
+                    />
+                  </div>
+                  <div className="mys-progress-percent">
+                    {getCompletionRate(survey.currentResponses, survey.maxResponses).toFixed(0)}% Complete
+                  </div>
+                </div>
+
+                {/* Subscription Info */}
+                {survey.hasSubscription && survey.subscriptionService && (
+                  <div className="mys-subscription-info">
+                    <div className="mys-subscription-header">
+                      <Gift size={14} />
+                      Subscription Service
+                    </div>
+                    <div className="mys-subscription-stats">
+                      <div className="mys-subscription-stat">
+                        <span className="mys-subscription-label">Revenue</span>
+                        <span className="mys-subscription-value">
+                          {formatSUI(survey.subscriptionService.totalRevenue)} SUI
+                        </span>
+                      </div>
+                      <div className="mys-subscription-stat">
+                        <span className="mys-subscription-label">Subscribers</span>
+                        <span className="mys-subscription-value">
+                          {survey.subscriptionService.subscriberCount}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Card Actions */}
+                <div className="mys-card-actions">
+                  <button 
+                    className="mys-action-btn primary"
+                    onClick={() => handleManageSurvey(survey.id)}
+                  >
+                    <Settings size={16} />
+                    Manage
+                  </button>
+                  <button 
+                    className="mys-action-btn secondary"
+                    onClick={() => viewSurveyDetails(survey.id)}
+                  >
+                    <Eye size={16} />
+                    View
+                  </button>
+                  {survey.hasSubscription && survey.subscriptionService && (
+                    <button 
+                      className="mys-action-btn icon"
+                      onClick={() => shareSubscriptionLink(survey.subscriptionService!.serviceId)}
+                      title="Share subscription link"
+                    >
+                      <ExternalLink size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Toast Notifications
+      <div className="mys-toast-container">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`mys-toast ${toast.type}`}>
+            {toast.type === 'success' && <CheckCircle size={16} />}
+            {toast.type === 'error' && <AlertCircle size={16} />}
+            {toast.type === 'warning' && <AlertCircle size={16} />}
+            {toast.type === 'info' && <AlertCircle size={16} />}
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div> */}
+    </div>
   );
 }
+
+export default MySurveys;

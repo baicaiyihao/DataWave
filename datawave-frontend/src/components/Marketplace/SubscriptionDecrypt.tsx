@@ -1,9 +1,7 @@
-// Subscription Decrypt Page with Seal Integration
-// 订阅后查看解密的问卷答案 - 完整实现
-
+// src/components/Marketplace/SubscriptionDecrypt.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, Flex, Text, Badge, Button, Dialog, AlertDialog, Spinner } from '@radix-ui/themes';
 import { useSuiClient, useCurrentAccount, useSignPersonalMessage } from '@mysten/dapp-kit';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
 import { fromHex } from '@mysten/sui/utils';
 import { SealClient, SessionKey, EncryptedObject, NoAccessError } from '@mysten/seal';
@@ -20,9 +18,13 @@ import {
   Calendar,
   Clock,
   Key,
-  Eye
+  Eye,
+  ArrowLeft,
+  ShoppingCart,
+  Shield
 } from 'lucide-react';
 import { set, get } from 'idb-keyval';
+import './SubscriptionDecrypt.css';
 
 const TTL_MIN = 10;
 
@@ -67,16 +69,24 @@ interface SubscriptionInfo {
   createdAt: number;
 }
 
-interface SubscriptionDecryptProps {
-  surveyId: string;
-  subscriptionId?: string;
+interface ToastData {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  message: string;
 }
 
-export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDecryptProps) {
+export function SubscriptionDecrypt() {
+  const { surveyId } = useParams<{ surveyId: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   const { mutate: signPersonalMessage } = useSignPersonalMessage();
   const packageId = ConfigService.getPackageId();
+  
+  // Get subscriptionId and return path from route state
+  const subscriptionId = location.state?.subscriptionId;
+  const returnPath = location.state?.returnPath;
   
   // Survey and subscription data
   const [surveyInfo, setSurveyInfo] = useState<SurveyInfo | null>(null);
@@ -95,6 +105,53 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
   const [showDecryptedDialog, setShowDecryptedDialog] = useState(false);
   const [currentDecryptedAnswer, setCurrentDecryptedAnswer] = useState<DecryptedAnswer | null>(null);
   
+  // Download progress state
+  const [downloadProgress, setDownloadProgress] = useState<{
+    current: number;
+    total: number;
+    status: string;
+  } | null>(null);
+
+  // Modal states
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [resultModalData, setResultModalData] = useState<{
+    type: 'success' | 'warning' | 'error';
+    title: string;
+    stats?: {
+      total: number;
+      success: number;
+      failed: number;
+      notDownloaded: number;
+    };
+    message?: string;
+  } | null>(null);
+
+  // Toast notifications
+  const [toasts, setToasts] = useState<ToastData[]>([]);
+
+  const showToast = (type: ToastData['type'], message: string) => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 3000);
+  };
+
+  // Navigation functions
+  const goBack = () => {
+    if (returnPath) {
+      navigate(returnPath);
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/app/marketplace/subscriptions');
+    }
+  };
+
+  const browseSubscriptions = () => {
+    navigate('/app/marketplace/subscriptions');
+  };
+  
   // Seal client configuration
   const serverObjectIds = [
     "0x73d05d62c18d9374e3ea529e8e0ed6161da1a141a94d3f76ae3fe4e99356db75",
@@ -112,20 +169,19 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
 
   // Move call constructor for subscription access
   const moveCallConstructor = (tx: Transaction, id: string) => {
-    if (!subscriptionInfo) {
+    if (!subscriptionInfo || !surveyId) {
       throw new Error('No subscription info available');
     }
     
-    // 使用 seal_approve_subscription 进行订阅验证
     tx.moveCall({
-    target: `${packageId}::survey_system::seal_approve_subscription`,
-    arguments: [
-        tx.pure.vector('u8', fromHex(id)), // 加密文件ID
-        tx.object(subscriptionInfo.id), // Subscription NFT (用户的订阅)
-        tx.object(subscriptionInfo.serviceId), // SubscriptionService (问卷的订阅服务)
-        tx.object(surveyId), // Survey object
-        tx.object('0x6'), // Clock
-    ],
+      target: `${packageId}::survey_system::seal_approve_subscription`,
+      arguments: [
+        tx.pure.vector('u8', fromHex(id)),
+        tx.object(subscriptionInfo.id),
+        tx.object(subscriptionInfo.serviceId),
+        tx.object(surveyId),
+        tx.object('0x6'),
+      ],
     });
   };
 
@@ -163,7 +219,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
           consentingUsers: parseInt(fields.consenting_users_count || '0'),
         });
         
-        // Load answer blobs - 只加载同意共享的答案
+        // Load answer blobs
         await loadConsentedAnswerBlobs(fields);
       }
       
@@ -189,7 +245,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
           });
         }
       } else {
-        // Find user's subscription for this survey
+        // Find user's subscription
         const userSubscriptions = await suiClient.getOwnedObjects({
           owner: currentAccount.address,
           options: { showContent: true },
@@ -236,8 +292,6 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
           parentId: surveyFields.encrypted_answer_blobs.fields.id.id,
         });
         
-        console.log(`Found ${answersTableFields.data.length} answer records`);
-        
         for (const field of answersTableFields.data) {
           const fieldData = await suiClient.getObject({
             id: field.objectId,
@@ -247,7 +301,6 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
           if (fieldData.data?.content && 'fields' in fieldData.data.content) {
             const value = (fieldData.data.content as any).fields?.value?.fields;
             if (value && value.consent_for_subscription) {
-              // 只加载同意共享的答案
               let sealKeyIdStr = value.seal_key_id;
               
               if (Array.isArray(sealKeyIdStr)) {
@@ -270,7 +323,6 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     }
     
     setAnswerBlobs(blobs);
-    console.log(`Loaded ${blobs.length} consented answer blobs`);
   };
 
   // Create or load session key
@@ -284,15 +336,14 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     setError(null);
     
     try {
-      // Try to load existing session key
       const stored = await get('sessionKey_subscription');
       if (stored) {
         try {
           const imported = await SessionKey.import(stored, suiClient);
           if (!imported.isExpired() && imported.getAddress() === currentAccount.address) {
             setSessionKey(imported);
-            console.log('Loaded existing session key');
             setCreatingSession(false);
+            showToast('success', 'Session key loaded successfully');
             return;
           }
         } catch (e) {
@@ -300,8 +351,6 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
         }
       }
       
-      // Create new session key
-      console.log('Creating new session key...');
       const newSessionKey = await SessionKey.create({
         address: currentAccount.address,
         packageId: packageId,
@@ -318,13 +367,14 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
             await newSessionKey.setPersonalMessageSignature(result.signature);
             setSessionKey(newSessionKey);
             await set('sessionKey_subscription', newSessionKey.export());
-            console.log('Session key created successfully');
             setCreatingSession(false);
+            showToast('success', 'Session key created successfully');
           },
           onError: (error) => {
             console.error('Signature failed:', error);
             setError('Failed to sign message');
             setCreatingSession(false);
+            showToast('error', 'Failed to create session key');
           }
         }
       );
@@ -332,6 +382,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
       console.error('Session key error:', error);
       setError(error.message);
       setCreatingSession(false);
+      showToast('error', 'Session key error: ' + error.message);
     }
   };
 
@@ -352,34 +403,93 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
       'aggregator6',
     ];
     
-    // Download all files in parallel
-    const downloadResults = await Promise.all(
-      blobIds.map(async (blobId) => {
+    // Download single blob with retry
+    const downloadBlobWithRetry = async (blobId: string, maxRetries = 3): Promise<{ blobId: string; data: ArrayBuffer } | null> => {
+      const attemptedAggregators = new Set<string>();
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const availableAggregators = aggregators.filter(a => !attemptedAggregators.has(a));
+        
+        if (availableAggregators.length === 0) {
+          console.error(`All aggregators failed for blob ${blobId}`);
+          break;
+        }
+        
+        const randomIndex = Math.floor(Math.random() * availableAggregators.length);
+        const aggregator = availableAggregators[randomIndex];
+        attemptedAggregators.add(aggregator);
+        
         try {
+          console.log(`Attempting download from ${aggregator} for blob ${blobId.slice(0, 10)}...`);
+          
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 10000);
-          const randomAggregator = aggregators[Math.floor(Math.random() * aggregators.length)];
-          const aggregatorUrl = `/${randomAggregator}/v1/blobs/${blobId}`;
-          const response = await fetch(aggregatorUrl, { signal: controller.signal });
+          
+          const aggregatorUrl = `/${aggregator}/v1/blobs/${blobId}`;
+          const response = await fetch(aggregatorUrl, { 
+            signal: controller.signal,
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          
           clearTimeout(timeout);
-          if (!response.ok) {
-            return null;
+          
+          if (response.ok) {
+            const data = await response.arrayBuffer();
+            console.log(`Successfully downloaded blob ${blobId.slice(0, 10)}... from ${aggregator}`);
+            return { blobId, data };
+          } else {
+            console.warn(`Failed to download from ${aggregator}: HTTP ${response.status}`);
           }
-          return { blobId, data: await response.arrayBuffer() };
         } catch (err) {
-          console.error(`Blob ${blobId} download failed`, err);
-          return null;
+          console.error(`Error downloading from ${aggregator}:`, err);
         }
-      }),
+      }
+      
+      return null;
+    };
+    
+    // Parallel download all files
+    console.log(`Starting download of ${blobIds.length} blobs...`);
+    
+    setDownloadProgress({
+      current: 0,
+      total: blobIds.length,
+      status: 'Downloading files...'
+    });
+    
+    let downloadedCount = 0;
+    const downloadResults = await Promise.all(
+      blobIds.map(async (blobId) => {
+        const result = await downloadBlobWithRetry(blobId);
+        downloadedCount++;
+        setDownloadProgress({
+          current: downloadedCount,
+          total: blobIds.length,
+          status: `Downloaded ${downloadedCount}/${blobIds.length} files...`
+        });
+        return result;
+      })
     );
 
     const validDownloads = downloadResults.filter((result): result is { blobId: string; data: ArrayBuffer } => result !== null);
     
+    console.log(`Successfully downloaded ${validDownloads.length}/${blobIds.length} blobs`);
+    
     if (validDownloads.length === 0) {
-      throw new Error('Failed to download any files');
+      throw new Error('Failed to download any files. All aggregator nodes might be unavailable.');
     }
 
     // Fetch keys in batches
+    console.log('Fetching decryption keys...');
+    setDownloadProgress({
+      current: downloadedCount,
+      total: blobIds.length,
+      status: 'Fetching decryption keys...'
+    });
+
     for (let i = 0; i < validDownloads.length; i += 10) {
       const batch = validDownloads.slice(i, i + 10);
       const ids = batch.map((item) => EncryptedObject.parse(new Uint8Array(item.data)).id);
@@ -389,8 +499,9 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
       
       try {
         await sealClient.fetchKeys({ ids, txBytes, sessionKey, threshold: 2 });
+        console.log(`Fetched keys for batch ${Math.floor(i/10) + 1}`);
       } catch (err) {
-        console.log(err);
+        console.error('Error fetching keys:', err);
         const errorMsg = err instanceof NoAccessError
           ? 'No subscription access'
           : 'Failed to decrypt files';
@@ -399,14 +510,23 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     }
 
     // Decrypt files
+    console.log('Decrypting files...');
+    setDownloadProgress({
+      current: downloadedCount,
+      total: blobIds.length,
+      status: 'Decrypting answers...'
+    });
+
     const decryptedData: DecryptedAnswer[] = [];
+    const failedDecryptions: string[] = [];
+    
     for (const { blobId, data } of validDownloads) {
-      const fullId = EncryptedObject.parse(new Uint8Array(data)).id;
-      const tx = new Transaction();
-      moveCallConstructor(tx, fullId);
-      const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
-      
       try {
+        const fullId = EncryptedObject.parse(new Uint8Array(data)).id;
+        const tx = new Transaction();
+        moveCallConstructor(tx, fullId);
+        const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
+        
         const decryptedFile = await sealClient.decrypt({
           data: new Uint8Array(data),
           sessionKey,
@@ -418,28 +538,48 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
         
         const blob = answerBlobs.find(b => b.blobId === blobId);
         if (blob) {
-          decryptedData.push({
+          const decryptedAnswer = {
             surveyId: answerData.surveyId,
             respondent: blob.respondent,
             timestamp: answerData.timestamp || blob.submittedAt,
             answers: answerData.answers,
             consent: answerData.consent || blob.consentForSubscription
-          });
+          };
           
-          decryptedAnswers.set(blobId, decryptedData[decryptedData.length - 1]);
+          decryptedData.push(decryptedAnswer);
+          decryptedAnswers.set(blobId, decryptedAnswer);
+          console.log(`Successfully decrypted blob ${blobId.slice(0, 10)}...`);
         }
       } catch (err) {
-        console.log(err);
-        const errorMsg = err instanceof NoAccessError
-          ? 'No subscription access'
-          : 'Failed to decrypt file';
-        console.error(errorMsg, err);
+        console.error(`Failed to decrypt blob ${blobId.slice(0, 10)}...`, err);
+        failedDecryptions.push(blobId);
       }
     }
 
+    setDownloadProgress(null);
+
     if (decryptedData.length > 0) {
       setDecryptedAnswers(new Map(decryptedAnswers));
-      alert(`Successfully decrypted ${decryptedData.length} answers`);
+      
+      // Show result modal
+      setResultModalData({
+        type: validDownloads.length === blobIds.length && failedDecryptions.length === 0 ? 'success' : 'warning',
+        title: 'Decryption Complete',
+        stats: {
+          total: blobIds.length,
+          success: decryptedData.length,
+          failed: failedDecryptions.length,
+          notDownloaded: blobIds.length - validDownloads.length
+        }
+      });
+      setShowResultModal(true);
+    } else {
+      setResultModalData({
+        type: 'error',
+        title: 'Decryption Failed',
+        message: 'Unable to decrypt any answers. Please check your subscription status and try again.'
+      });
+      setShowResultModal(true);
     }
   };
 
@@ -468,6 +608,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     } catch (error: any) {
       console.error('Decryption error:', error);
       setError(error.message || 'Decryption failed');
+      showToast('error', 'Failed to decrypt: ' + error.message);
     } finally {
       setDecryptingBlobId(null);
     }
@@ -494,6 +635,7 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     } catch (error: any) {
       console.error('Batch decryption error:', error);
       setError(error.message || 'Batch decryption failed');
+      showToast('error', 'Batch decryption failed: ' + error.message);
     } finally {
       setDecryptingBlobId(null);
     }
@@ -505,13 +647,11 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     
     const answers = Array.from(decryptedAnswers.values());
     
-    // Create CSV header
     const headers = ['Respondent', 'Submitted At', 'Consent'];
     surveyInfo.questions.forEach(q => {
       headers.push(q.question_text);
     });
     
-    // Create CSV rows
     const rows = answers.map(answer => {
       const row = [
         answer.respondent,
@@ -527,13 +667,11 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
       return row;
     });
     
-    // Combine into CSV string
     const csvContent = [
       headers.join(','),
       ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
     ].join('\n');
     
-    // Download CSV
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -541,11 +679,15 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     link.download = `survey-${surveyId}-subscription-answers.csv`;
     link.click();
     window.URL.revokeObjectURL(url);
+    
+    showToast('success', 'CSV exported successfully');
   };
 
   // Load data on mount
   useEffect(() => {
-    loadData();
+    if (surveyId) {
+      loadData();
+    }
   }, [surveyId, subscriptionId, currentAccount?.address]);
 
   // Auto load session key
@@ -559,7 +701,6 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
           const imported = await SessionKey.import(stored, suiClient);
           if (!imported.isExpired() && imported.getAddress() === currentAccount.address) {
             setSessionKey(imported);
-            console.log('Auto-loaded session key');
           }
         }
       } catch (e) {
@@ -594,307 +735,423 @@ export function SubscriptionDecrypt({ surveyId, subscriptionId }: SubscriptionDe
     return answer;
   };
 
+  // Render different states
+  if (!surveyId) {
+    return (
+      <div className="sd-container">
+        <div className="sd-no-access">
+          <AlertCircle size={48} className="sd-no-access-icon" />
+          <h2 className="sd-no-access-title">No Survey ID</h2>
+          <p className="sd-no-access-desc">Survey ID is required to view this page</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <Card>
-        <Flex justify="center" align="center" py="5">
-          <Spinner />
-          <Text ml="2">Loading survey data...</Text>
-        </Flex>
-      </Card>
+      <div className="sd-container">
+        <div className="sd-loading">
+          <div className="sd-loading-spinner"></div>
+          <div className="sd-loading-text">Loading survey data...</div>
+        </div>
+      </div>
     );
   }
 
   if (!surveyInfo) {
     return (
-      <Card>
-        <Text>Survey not found</Text>
-      </Card>
+      <div className="sd-container">
+        <div className="sd-no-access">
+          <AlertCircle size={48} className="sd-no-access-icon" />
+          <h2 className="sd-no-access-title">Survey Not Found</h2>
+          <p className="sd-no-access-desc">The requested survey could not be found</p>
+          <button className="sd-btn primary" onClick={goBack}>
+            <ArrowLeft size={16} />
+            Go Back
+          </button>
+        </div>
+      </div>
     );
   }
 
   if (!subscriptionInfo) {
     return (
-      <Card>
-        <Flex direction="column" align="center" gap="3" py="5">
-          <Lock size={48} />
-          <Text size="4" weight="bold">Subscription Required</Text>
-          <Text size="2" color="gray">You need an active subscription to view survey answers</Text>
-          <Button onClick={() => {
-            const event = new CustomEvent('navigateTo', { 
-              detail: { tab: 'browse-subscriptions' } 
-            });
-            window.dispatchEvent(event);
-          }}>
+      <div className="sd-container">
+        <div className="sd-no-access">
+          <Lock size={48} className="sd-no-access-icon" />
+          <h2 className="sd-no-access-title">Subscription Required</h2>
+          <p className="sd-no-access-desc">You need an active subscription to view survey answers</p>
+          <button className="sd-btn primary" onClick={browseSubscriptions}>
+            <ShoppingCart size={16} />
             Browse Subscriptions
-          </Button>
-        </Flex>
-      </Card>
+          </button>
+        </div>
+      </div>
     );
   }
 
+  // Main UI
   return (
-    <Flex direction="column" gap="3">
+    <div className="sd-container">
       {/* Header */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="start">
-            <div>
-              <Text size="5" weight="bold">{surveyInfo.title}</Text>
-              <Text size="2" color="gray">{surveyInfo.description}</Text>
-              <Flex gap="2" mt="2">
-                <Badge>{surveyInfo.category}</Badge>
-                <Badge variant="soft">
-                  <Users size={12} />
-                  {surveyInfo.responseCount} Responses
-                </Badge>
-                <Badge variant="soft" color="green">
-                  <CheckCircle size={12} />
-                  {surveyInfo.consentingUsers} Consented
-                </Badge>
-              </Flex>
+      <div className="sd-header">
+        <button className="sd-back-btn" onClick={goBack}>
+          <ArrowLeft size={16} />
+          Back
+        </button>
+        
+        <div className="sd-header-content">
+          <div className="sd-survey-info">
+            <h1 className="sd-survey-title">{surveyInfo.title}</h1>
+            <p className="sd-survey-desc">{surveyInfo.description}</p>
+            <div className="sd-survey-stats">
+              <span className="sd-stat-badge category">{surveyInfo.category}</span>
+              <span className="sd-stat-badge responses">
+                <Users size={14} />
+                {surveyInfo.responseCount} Responses
+              </span>
+              <span className="sd-stat-badge consented">
+                <CheckCircle size={14} />
+                {surveyInfo.consentingUsers} Consented
+              </span>
             </div>
-            
-            <Flex direction="column" align="end" gap="2">
-              {subscriptionInfo.isExpired ? (
-                <Badge color="red" size="2">
-                  Subscription Expired
-                </Badge>
-              ) : (
-                <Badge color="green" size="2">
-                  <Clock size={12} />
-                  {getTimeRemaining(subscriptionInfo.expiresAt)}
-                </Badge>
-              )}
-            </Flex>
-          </Flex>
-        </Flex>
-      </Card>
-
-      {/* Session Key & Actions */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="center">
-            <div>
-              <Text size="3" weight="bold">Decryption Controls</Text>
-              <Text size="2" color="gray">
-                {answerBlobs.length} consented answers available
-              </Text>
-            </div>
-            
-            <Flex gap="2">
-              <Badge color={sessionKey ? 'green' : 'orange'} size="2">
-                <Key size={12} />
-                {sessionKey ? 'Session Key Ready' : 'No Session Key'}
-              </Badge>
-            </Flex>
-          </Flex>
+          </div>
           
-          <Flex gap="2">
-            {!sessionKey && (
-              <Button
-                onClick={handleSessionKey}
-                disabled={creatingSession}
-                size="2"
+          <div className="sd-subscription-status">
+            {subscriptionInfo.isExpired ? (
+              <div className="sd-status-badge expired">
+                <AlertCircle size={16} />
+                Subscription Expired
+              </div>
+            ) : (
+              <div className="sd-status-badge active">
+                <Clock size={16} />
+                {getTimeRemaining(subscriptionInfo.expiresAt)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Control Panel */}
+      <div className="sd-control-panel">
+        <div className="sd-control-header">
+          <div>
+            <h2 className="sd-control-title">Decryption Controls</h2>
+            <p className="sd-control-subtitle">
+              {answerBlobs.length} consented answers available for decryption
+            </p>
+          </div>
+          
+          <div className={`sd-session-badge ${sessionKey ? 'ready' : 'not-ready'}`}>
+            <Key size={14} />
+            {sessionKey ? 'Session Key Ready' : 'No Session Key'}
+          </div>
+        </div>
+        
+        <div className="sd-control-actions">
+          {!sessionKey && (
+            <button
+              className="sd-btn primary"
+              onClick={handleSessionKey}
+              disabled={creatingSession}
+            >
+              {creatingSession ? (
+                <>
+                  <RefreshCw size={16} className="sd-spinning" />
+                  Creating Session Key...
+                </>
+              ) : (
+                <>
+                  <Key size={16} />
+                  Create Session Key
+                </>
+              )}
+            </button>
+          )}
+          
+          {sessionKey && !subscriptionInfo.isExpired && answerBlobs.length > 0 && (
+            <>
+              <button
+                className="sd-btn success"
+                onClick={decryptAllAnswers}
+                disabled={decryptingBlobId === 'all'}
               >
-                {creatingSession ? (
-                  <Flex align="center" gap="2">
-                    <Spinner />
-                    Creating...
-                  </Flex>
+                {decryptingBlobId === 'all' ? (
+                  <>
+                    <RefreshCw size={16} className="sd-spinning" />
+                    Decrypting All...
+                  </>
                 ) : (
                   <>
-                    <Key size={16} />
-                    Create Session Key
+                    <Unlock size={16} />
+                    Decrypt All Answers
                   </>
                 )}
-              </Button>
-            )}
-            
-            {sessionKey && !subscriptionInfo.isExpired && answerBlobs.length > 0 && (
-              <>
-                <Button
-                  onClick={decryptAllAnswers}
-                  disabled={decryptingBlobId === 'all'}
-                  size="2"
-                  color="green"
+              </button>
+              
+              {decryptedAnswers.size > 0 && (
+                <button
+                  className="sd-btn secondary"
+                  onClick={exportToCSV}
                 >
-                  {decryptingBlobId === 'all' ? (
-                    <Flex align="center" gap="2">
-                      <Spinner />
-                      Decrypting...
-                    </Flex>
-                  ) : (
-                    <>
-                      <Unlock size={16} />
-                      Decrypt All Answers
-                    </>
-                  )}
-                </Button>
-                
-                {decryptedAnswers.size > 0 && (
-                  <Button
-                    variant="soft"
-                    onClick={exportToCSV}
-                    size="2"
-                  >
-                    <Download size={16} />
-                    Export CSV
-                  </Button>
-                )}
-              </>
-            )}
-          </Flex>
-        </Flex>
-      </Card>
+                  <Download size={16} />
+                  Export to CSV
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        
+        {error && (
+          <div className="sd-error-message">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+        
+        {/* Download Progress */}
+        {downloadProgress && (
+          <div className="sd-progress-container">
+            <div className="sd-progress-header">
+              <RefreshCw size={16} className="sd-spinning" />
+              <span>{downloadProgress.status}</span>
+            </div>
+            <div className="sd-progress-bar">
+              <div 
+                className="sd-progress-fill"
+                style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
+              />
+            </div>
+            <div className="sd-progress-text">
+              {downloadProgress.current} of {downloadProgress.total} files processed
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Answers List */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Text size="3" weight="bold">Survey Answers (Consented Only)</Text>
-          
-          {answerBlobs.length === 0 ? (
-            <Text size="2" color="gray">No consented answers available</Text>
-          ) : (
-            <Flex direction="column" gap="2">
-              {answerBlobs.map((blob, idx) => {
-                const isDecrypted = decryptedAnswers.has(blob.blobId);
-                
-                return (
-                  <Card key={blob.blobId} style={{ backgroundColor: 'var(--gray-1)' }}>
-                    <Flex justify="between" align="center">
-                      <Flex direction="column" gap="1">
-                        <Flex align="center" gap="2">
-                          <Text size="3" weight="bold">Answer #{idx + 1}</Text>
-                          <Badge size="1" color="green">Consented</Badge>
+      <div className="sd-answers-section">
+        <h2 className="sd-answers-header">
+          Survey Answers
+          <span className="sd-answers-count">{answerBlobs.length}</span>
+        </h2>
+        
+        {answerBlobs.length === 0 ? (
+          <div className="sd-empty-state">
+            <Shield size={48} className="sd-empty-icon" />
+            <h3 className="sd-empty-title">No Consented Answers</h3>
+            <p className="sd-empty-desc">
+              There are no answers with consent for subscription sharing
+            </p>
+          </div>
+        ) : (
+          <div>
+            {answerBlobs.map((blob, idx) => {
+              const isDecrypted = decryptedAnswers.has(blob.blobId);
+              
+              return (
+                <div key={blob.blobId} className="sd-answer-card">
+                  <div className="sd-answer-content">
+                    <div className="sd-answer-info">
+                      <div className="sd-answer-header">
+                        <span className="sd-answer-number">Answer #{idx + 1}</span>
+                        <div className="sd-answer-badges">
+                          <span className="sd-answer-badge consented">Consented</span>
                           {isDecrypted && (
-                            <Badge size="1" color="blue">Decrypted</Badge>
+                            <span className="sd-answer-badge decrypted">Decrypted</span>
                           )}
-                        </Flex>
-                        <Text size="1" color="gray">
-                          Submitted: {formatDate(blob.submittedAt)}
-                        </Text>
-                        <Text size="1" color="gray" style={{ fontFamily: 'monospace' }}>
-                          Blob ID: {blob.blobId.slice(0, 16)}...
-                        </Text>
-                      </Flex>
-                      
-                      <Flex gap="2">
-                        {isDecrypted && (
-                          <Button
-                            size="2"
-                            variant="soft"
-                            onClick={() => {
-                              setCurrentDecryptedAnswer(decryptedAnswers.get(blob.blobId)!);
-                              setShowDecryptedDialog(true);
-                            }}
-                          >
-                            <Eye size={16} />
-                            View
-                          </Button>
-                        )}
-                        <Button
-                          size="2"
-                          onClick={() => decryptSingleAnswer(blob)}
-                          disabled={!sessionKey || subscriptionInfo.isExpired || decryptingBlobId === blob.blobId}
+                        </div>
+                      </div>
+                      <div className="sd-answer-meta">
+                        Submitted: {formatDate(blob.submittedAt)}
+                      </div>
+                      <div className="sd-answer-blob">
+                        Blob ID: {blob.blobId.slice(0, 20)}...
+                      </div>
+                    </div>
+                    
+                    <div className="sd-answer-actions">
+                      {isDecrypted && (
+                        <button
+                          className="sd-btn secondary"
+                          onClick={() => {
+                            setCurrentDecryptedAnswer(decryptedAnswers.get(blob.blobId)!);
+                            setShowDecryptedDialog(true);
+                          }}
                         >
-                          {decryptingBlobId === blob.blobId ? (
-                            <Flex align="center" gap="2">
-                              <Spinner />
-                              Decrypting...
-                            </Flex>
-                          ) : isDecrypted ? (
-                            <>
-                              <Unlock size={16} />
-                              Re-decrypt
-                            </>
-                          ) : (
-                            <>
-                              <Lock size={16} />
-                              Decrypt
-                            </>
-                          )}
-                        </Button>
-                      </Flex>
-                    </Flex>
-                  </Card>
-                );
-              })}
-            </Flex>
-          )}
-        </Flex>
-      </Card>
+                          <Eye size={16} />
+                          View
+                        </button>
+                      )}
+                      <button
+                        className="sd-btn primary"
+                        onClick={() => decryptSingleAnswer(blob)}
+                        disabled={!sessionKey || subscriptionInfo.isExpired || decryptingBlobId === blob.blobId}
+                      >
+                        {decryptingBlobId === blob.blobId ? (
+                          <>
+                            <RefreshCw size={16} className="sd-spinning" />
+                            Decrypting...
+                          </>
+                        ) : isDecrypted ? (
+                          <>
+                            <Unlock size={16} />
+                            Re-decrypt
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={16} />
+                            Decrypt
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* Error Dialog */}
-      <AlertDialog.Root open={!!error}>
-        <AlertDialog.Content>
-          <AlertDialog.Title>Error</AlertDialog.Title>
-          <AlertDialog.Description>{error}</AlertDialog.Description>
-          <Flex gap="3" mt="4" justify="end">
-            <Button onClick={() => setError(null)}>Close</Button>
-          </Flex>
-        </AlertDialog.Content>
-      </AlertDialog.Root>
+      {/* Result Modal */}
+      {showResultModal && resultModalData && (
+        <div className="sd-modal-overlay" onClick={() => setShowResultModal(false)}>
+          <div className="sd-result-modal" onClick={e => e.stopPropagation()}>
+            <div className="sd-modal-icon" style={{ 
+              color: resultModalData.type === 'success' ? '#10b981' : 
+                     resultModalData.type === 'warning' ? '#f59e0b' : '#ef4444' 
+            }}>
+              {resultModalData.type === 'success' ? (
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              ) : resultModalData.type === 'warning' ? (
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              ) : (
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+              )}
+            </div>
+            
+            <h3 className="sd-modal-title">{resultModalData.title}</h3>
+            
+            {resultModalData.stats ? (
+              <div className="sd-modal-stats">
+                <div className="sd-stat-row">
+                  <span className="sd-stat-label">Total Files:</span>
+                  <span className="sd-stat-value">{resultModalData.stats.total}</span>
+                </div>
+                <div className="sd-stat-row success">
+                  <span className="sd-stat-label">✓ Successfully Decrypted:</span>
+                  <span className="sd-stat-value">{resultModalData.stats.success}</span>
+                </div>
+                {resultModalData.stats.failed > 0 && (
+                  <div className="sd-stat-row warning">
+                    <span className="sd-stat-label">⚠ Failed to Decrypt:</span>
+                    <span className="sd-stat-value">{resultModalData.stats.failed}</span>
+                  </div>
+                )}
+                {resultModalData.stats.notDownloaded > 0 && (
+                  <div className="sd-stat-row error">
+                    <span className="sd-stat-label">✕ Download Failed:</span>
+                    <span className="sd-stat-value">{resultModalData.stats.notDownloaded}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="sd-modal-message">{resultModalData.message}</p>
+            )}
+            
+            <div className="sd-modal-actions">
+              {resultModalData.type === 'success' && decryptedAnswers.size > 0 && (
+                <button 
+                  className="sd-btn success"
+                  onClick={() => {
+                    exportToCSV();
+                    setShowResultModal(false);
+                  }}
+                >
+                  <Download size={16} />
+                  Export CSV
+                </button>
+              )}
+              <button 
+                className="sd-btn secondary"
+                onClick={() => setShowResultModal(false)}
+              >
+                Close
+              </button>
+            </div>
+            
+            {resultModalData.type === 'success' && (
+              <div className="sd-modal-progress"></div>
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* Decrypted Answer Dialog */}
-      <Dialog.Root open={showDecryptedDialog} onOpenChange={setShowDecryptedDialog}>
-        <Dialog.Content style={{ maxWidth: '600px' }}>
-          <Dialog.Title>Decrypted Answer</Dialog.Title>
-          {currentDecryptedAnswer && (
-            <Flex direction="column" gap="3" mt="3">
-              <Card style={{ backgroundColor: 'var(--gray-1)' }}>
-                <Flex direction="column" gap="2">
-                  <Flex justify="between">
-                    <Text size="2" weight="bold">Respondent:</Text>
-                    <Text size="2" style={{ fontFamily: 'monospace' }}>
-                      {currentDecryptedAnswer.respondent.slice(0, 10)}...
-                    </Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" weight="bold">Submitted:</Text>
-                    <Text size="2">{formatDate(currentDecryptedAnswer.timestamp)}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" weight="bold">Data Consent:</Text>
-                    <Badge color="green">Yes</Badge>
-                  </Flex>
-                </Flex>
-              </Card>
-              
-              <Text size="3" weight="bold">Answers:</Text>
-              
+      {/* Decrypted Answer Modal */}
+      {showDecryptedDialog && currentDecryptedAnswer && (
+        <div className="sd-modal-overlay" onClick={() => setShowDecryptedDialog(false)}>
+          <div className="sd-answer-detail-modal" onClick={e => e.stopPropagation()}>
+            <h3 className="sd-modal-header">Decrypted Answer Details</h3>
+            
+            <div className="sd-modal-metadata">
+              <div className="sd-metadata-item">
+                <strong>Respondent:</strong> {currentDecryptedAnswer.respondent.slice(0, 16)}...
+              </div>
+              <div className="sd-metadata-item">
+                <strong>Submitted:</strong> {formatDate(currentDecryptedAnswer.timestamp)}
+              </div>
+            </div>
+            
+            <div className="sd-answer-questions">
               {currentDecryptedAnswer.answers.map((ans, idx) => (
-                <Card key={idx} style={{ backgroundColor: 'var(--blue-1)' }}>
-                  <Flex direction="column" gap="2">
-                    <Flex align="center" gap="2">
-                      <Text size="2" weight="bold">Q{ans.questionIndex + 1}:</Text>
-                      <Badge size="1" color={
-                        ans.questionType === 0 ? 'blue' :
-                        ans.questionType === 1 ? 'green' : 'purple'
-                      }>
-                        {ans.questionType === 0 ? 'Single' :
-                         ans.questionType === 1 ? 'Multiple' : 'Text'}
-                      </Badge>
-                    </Flex>
-                    <Text size="2">{ans.questionText}</Text>
-                    <Card style={{ backgroundColor: 'white' }}>
-                      <Text size="2" weight="medium">
-                        {formatAnswer(ans.answer, ans.questionType)}
-                      </Text>
-                    </Card>
-                  </Flex>
-                </Card>
+                <div key={idx} className="sd-question-item">
+                  <div className="sd-question-number">Question {ans.questionIndex + 1}</div>
+                  <div className="sd-question-text">{ans.questionText}</div>
+                  <div className="sd-question-answer">
+                    {formatAnswer(ans.answer, ans.questionType)}
+                  </div>
+                </div>
               ))}
-              
-              <Flex gap="3" justify="end">
-                <Button onClick={() => setShowDecryptedDialog(false)}>
-                  Close
-                </Button>
-              </Flex>
-            </Flex>
-          )}
-        </Dialog.Content>
-      </Dialog.Root>
-    </Flex>
+            </div>
+            
+            <button
+              className="sd-btn secondary full-width"
+              onClick={() => setShowDecryptedDialog(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notifications */}
+      <div className="sd-toast-container">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`sd-toast ${toast.type}`}>
+            <div className="sd-toast-icon">
+              {toast.type === 'success' && <CheckCircle size={16} />}
+              {toast.type === 'error' && <AlertCircle size={16} />}
+              {toast.type === 'warning' && <AlertCircle size={16} />}
+              {toast.type === 'info' && <AlertCircle size={16} />}
+            </div>
+            <span className="sd-toast-message">{toast.message}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
+
+export default SubscriptionDecrypt;

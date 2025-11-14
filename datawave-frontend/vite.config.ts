@@ -7,6 +7,9 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
+    fs: {
+      strict: false // 允许访问项目根目录外的文件
+    },
     proxy: {
       '/aggregator1/v1': {
         target: 'https://aggregator.walrus-testnet.walrus.space',
@@ -82,4 +85,5 @@ export default defineConfig({
       },
     },
   },
+  publicDir: 'public'
 });

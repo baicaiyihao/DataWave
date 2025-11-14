@@ -1,11 +1,29 @@
-// View All Surveys Component with Pagination
-// 自动查询所有问卷并分页展示
-
+// src/components/Respondents/ViewAllSurveys.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, Flex, Text, Badge, Button, Grid, Select, TextField } from '@radix-ui/themes';
-import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
+import { useSuiClient } from '@mysten/dapp-kit';
 import { ConfigService } from '../../services/config';
-import { ChevronLeft, ChevronRight, RefreshCw, Search, Filter } from 'lucide-react';
+import { 
+  Search, 
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Coins,
+  Users,
+  CheckCircle,
+  Clock,
+  Eye,
+  Edit3,
+  Calendar,
+  MessageSquare,
+  Star,
+  UserCheck,
+  TrendingUp,
+  Heart,
+  ShoppingCart,
+  Briefcase
+} from 'lucide-react';
+import './ViewAllSurveys.css';
 
 interface SurveyBasicInfo {
   id: string;
@@ -20,67 +38,112 @@ interface SurveyBasicInfo {
   creator?: string;
 }
 
-interface ViewAllSurveysProps {
-  onViewDetails?: (surveyId: string) => void;
-}
+// 基于调研类型的分类
+const SURVEY_CATEGORIES = [
+  'All Types',
+  'Feedback',      // 产品/服务反馈
+  'Research',      // 市场研究
+  'Opinion',       // 观点调查
+  'Experience',    // 用户体验
+  'Satisfaction',  // 满意度调查
+  'Testing',       // 产品测试
+  'Demographics',  // 人口统计
+  'Preference',    // 偏好调查
+  'Evaluation',    // 评估调研
+  'Knowledge',     // 知识测试
+  'Behavioral',    // 行为研究
+  'Other'         // 其他
+];
 
-export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
+// 分类图标映射
+const getCategoryIcon = (category: string) => {
+  const icons: Record<string, React.ReactNode> = {
+    'Feedback': <MessageSquare size={14} />,
+    'Research': <TrendingUp size={14} />,
+    'Opinion': <Star size={14} />,
+    'Experience': <Heart size={14} />,
+    'Satisfaction': <UserCheck size={14} />,
+    'Testing': <ShoppingCart size={14} />,
+    'Demographics': <Users size={14} />,
+    'Preference': <Heart size={14} />,
+    'Evaluation': <Briefcase size={14} />,
+    'Knowledge': <Calendar size={14} />,
+    'Behavioral': <TrendingUp size={14} />,
+    'Other': <MessageSquare size={14} />
+  };
+  return icons[category] || icons['Other'];
+};
+
+// 骨架屏组件
+const SkeletonRow = () => (
+  <div className="vas-survey-row skeleton">
+    <div className="vas-td-survey">
+      <div className="vas-skeleton-box vas-skeleton-title"></div>
+      <div className="vas-skeleton-box vas-skeleton-desc"></div>
+    </div>
+    <div className="vas-td-category">
+      <div className="vas-skeleton-box vas-skeleton-badge"></div>
+    </div>
+    <div className="vas-td-reward">
+      <div className="vas-skeleton-box vas-skeleton-reward"></div>
+    </div>
+    <div className="vas-td-responses">
+      <div className="vas-skeleton-box vas-skeleton-responses"></div>
+    </div>
+    <div className="vas-td-progress">
+      <div className="vas-skeleton-box vas-skeleton-progress"></div>
+    </div>
+    <div className="vas-td-status">
+      <div className="vas-skeleton-box vas-skeleton-status"></div>
+    </div>
+    <div className="vas-td-actions">
+      <div className="vas-skeleton-box vas-skeleton-btn"></div>
+      <div className="vas-skeleton-box vas-skeleton-btn"></div>
+    </div>
+  </div>
+);
+
+export function ViewAllSurveys() {
   const suiClient = useSuiClient();
-  const currentAccount = useCurrentAccount();
+  const navigate = useNavigate();
   
   const [surveys, setSurveys] = useState<SurveyBasicInfo[]>([]);
   const [filteredSurveys, setFilteredSurveys] = useState<SurveyBasicInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedSurvey, setSelectedSurvey] = useState<string>('');
+  const [loading, setLoading] = useState(true);
   
-  // 分页状态
+  // Tabs - 默认显示 'all' 而不是 'active'
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'ended'>('all');
+  
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const [itemsPerPage] = useState(10);
   
-  // 筛选状态
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'closed'>('all');
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [categories, setCategories] = useState<string[]>(['all']);
-  
-  // 统计信息
-  const [stats, setStats] = useState({
-    totalSurveys: 0,
-    activeSurveys: 0,
-    totalResponses: 0,
-  });
+  const [filterCategory, setFilterCategory] = useState('All Types');
+  const [sortBy, setSortBy] = useState<'reward' | 'responses' | 'created'>('created');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // 获取所有问卷
+  // Fetch all surveys
   const fetchAllSurveys = async () => {
     setLoading(true);
+    
+    // 模拟延迟以展示骨架屏效果
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     try {
       const registryId = ConfigService.getSurveyRegistryId();
       
-      // 获取 Registry 对象
       const registry = await suiClient.getObject({
         id: registryId,
-        options: {
-          showContent: true,
-        }
+        options: { showContent: true }
       });
-
-      console.log('Registry object:', registry);
 
       if (registry.data?.content && 'fields' in registry.data.content) {
         const fields = registry.data.content.fields;
-        
-        // 获取统计信息
-        setStats({
-          totalSurveys: parseInt(fields.total_surveys || '0'),
-          activeSurveys: 0, // 需要计算
-          totalResponses: parseInt(fields.total_responses || '0'),
-        });
-
-        // 获取 all_surveys table
         const allSurveysTable = fields.all_surveys?.fields?.id?.id;
         
         if (allSurveysTable) {
-          // 查询所有问卷的动态字段
           let hasNextPage = true;
           let cursor = null;
           const allSurveyData: SurveyBasicInfo[] = [];
@@ -89,53 +152,38 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
             const dynamicFields = await suiClient.getDynamicFields({
               parentId: allSurveysTable,
               cursor,
-              limit: 50, // 每次获取50个
+              limit: 50
             });
             
-            console.log(`Fetched ${dynamicFields.data.length} surveys`);
-            
-            // 批量获取问卷详情
             const surveyPromises = dynamicFields.data.map(async (field) => {
               try {
-                // 获取动态字段的内容（SurveyBasicInfo）
-                const fieldObject = await suiClient.getDynamicFieldObject({
-                  parentId: allSurveysTable,
-                  name: field.name,
-                });
-                
-                if (fieldObject.data?.content && 'fields' in fieldObject.data.content) {
-                  const basicInfo = fieldObject.data.content.fields.value?.fields;
-                  if (basicInfo) {
-                    return {
-                      id: field.name.value as string,
-                      title: basicInfo.title || '',
-                      description: basicInfo.description || '',
-                      category: basicInfo.category || '',
-                      isActive: basicInfo.is_active || false,
-                      currentResponses: parseInt(basicInfo.current_responses || '0'),
-                      maxResponses: parseInt(basicInfo.max_responses || '0'),
-                      rewardPerResponse: basicInfo.reward_per_response || '0',
-                      createdAt: basicInfo.created_at || '0',
-                      creator: basicInfo.creator || '',
-                    };
-                  }
-                }
-                
-                // 备选方案：直接获取 Survey 对象
                 const surveyObj = await suiClient.getObject({
                   id: field.name.value as string,
-                  options: {
-                    showContent: true,
-                  }
+                  options: { showContent: true }
                 });
                 
                 if (surveyObj.data?.content && 'fields' in surveyObj.data.content) {
                   const surveyFields = surveyObj.data.content.fields;
+                  
+                  // 确保类别是有效的调研类型
+                  let category = surveyFields.category || 'Other';
+                  if (!SURVEY_CATEGORIES.includes(category) || category === 'All Types') {
+                    // 如果是旧的分类，映射到新的分类
+                    const categoryMap: Record<string, string> = {
+                      'feedback': 'Feedback',
+                      'DeFi': 'Research',
+                      'Gaming': 'Experience',
+                      'NFT': 'Opinion',
+                      'Social': 'Satisfaction'
+                    };
+                    category = categoryMap[category] || 'Other';
+                  }
+                  
                   return {
                     id: field.name.value as string,
                     title: surveyFields.title || '',
                     description: surveyFields.description || '',
-                    category: surveyFields.category || '',
+                    category: category,
                     isActive: surveyFields.is_active || false,
                     currentResponses: parseInt(surveyFields.current_responses || '0'),
                     maxResponses: parseInt(surveyFields.max_responses || '0'),
@@ -158,21 +206,8 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
             cursor = dynamicFields.nextCursor;
           }
           
-          // 按创建时间排序（最新的在前）
-          allSurveyData.sort((a, b) => {
-            return parseInt(b.createdAt || '0') - parseInt(a.createdAt || '0');
-          });
-          
           setSurveys(allSurveyData);
           setFilteredSurveys(allSurveyData);
-          
-          // 提取所有类别
-          const uniqueCategories = Array.from(new Set(allSurveyData.map(s => s.category)));
-          setCategories(['all', ...uniqueCategories]);
-          
-          // 计算活跃问卷数量
-          const activeCount = allSurveyData.filter(s => s.isActive).length;
-          setStats(prev => ({ ...prev, activeSurveys: activeCount }));
         }
       }
     } catch (error) {
@@ -182,23 +217,19 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
     }
   };
 
-  // 应用筛选
+  // Apply filters and sorting
   useEffect(() => {
     let filtered = [...surveys];
     
-    // 按类别筛选
-    if (filterCategory !== 'all') {
-      filtered = filtered.filter(s => s.category === filterCategory);
+    // Tab filter
+    if (activeTab === 'active') {
+      filtered = filtered.filter(s => s.isActive && s.currentResponses < s.maxResponses);
+    } else if (activeTab === 'ended') {
+      filtered = filtered.filter(s => !s.isActive || s.currentResponses >= s.maxResponses);
     }
+    // 'all' tab shows everything without filter
     
-    // 按状态筛选
-    if (filterStatus === 'active') {
-      filtered = filtered.filter(s => s.isActive);
-    } else if (filterStatus === 'closed') {
-      filtered = filtered.filter(s => !s.isActive);
-    }
-    
-    // 按搜索词筛选
+    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(s => 
         s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -206,254 +237,318 @@ export function ViewAllSurveys({ onViewDetails }: ViewAllSurveysProps = {}) {
       );
     }
     
+    // Category filter
+    if (filterCategory !== 'All Types') {
+      filtered = filtered.filter(s => s.category === filterCategory);
+    }
+    
+    // Sorting
+    filtered.sort((a, b) => {
+      let compareValue = 0;
+      
+      switch (sortBy) {
+        case 'reward':
+          compareValue = parseInt(a.rewardPerResponse) - parseInt(b.rewardPerResponse);
+          break;
+        case 'responses':
+          compareValue = a.currentResponses - b.currentResponses;
+          break;
+        case 'created':
+          compareValue = parseInt(a.createdAt || '0') - parseInt(b.createdAt || '0');
+          break;
+      }
+      
+      return sortOrder === 'asc' ? compareValue : -compareValue;
+    });
+    
     setFilteredSurveys(filtered);
-    setCurrentPage(1); // 重置到第一页
-  }, [filterCategory, filterStatus, searchTerm, surveys]);
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, filterCategory, sortBy, sortOrder, surveys]);
 
-  // 初始加载
+  // Initial load
   useEffect(() => {
     fetchAllSurveys();
   }, []);
 
-  // 分页计算
+  // Pagination
   const totalPages = Math.ceil(filteredSurveys.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentSurveys = filteredSurveys.slice(startIndex, endIndex);
+  const currentSurveys = filteredSurveys.slice(startIndex, startIndex + itemsPerPage);
 
-  // 格式化时间
-  const formatDate = (timestamp: string) => {
-    const date = new Date(parseInt(timestamp));
-    return date.toLocaleDateString();
-  };
-
-  // 格式化 SUI
+  // Utility functions
   const formatSUI = (amount: string) => {
     return (parseInt(amount) / 1000000000).toFixed(3);
   };
 
-  // 查看详情
-  const viewDetails = (surveyId: string) => {
-    setSelectedSurvey(surveyId);
-    // 使用回调或者设置状态来显示详情
-    if (onViewDetails) {
-      onViewDetails(surveyId);
+  const formatDate = (timestamp: string) => {
+    const date = new Date(parseInt(timestamp));
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    
+    return date.toLocaleDateString();
+  };
+
+  const getProgressPercentage = (current: number, max: number) => {
+    return max > 0 ? Math.round((current / max) * 100) : 0;
+  };
+
+  // Stats
+  const stats = {
+    total: surveys.length,
+    active: surveys.filter(s => s.isActive && s.currentResponses < s.maxResponses).length,
+    ended: surveys.filter(s => !s.isActive || s.currentResponses >= s.maxResponses).length
+  };
+
+  // 如果当前tab没有数据，显示提示信息
+  const getEmptyMessage = () => {
+    if (activeTab === 'active') {
+      return {
+        title: 'No Active Surveys',
+        desc: 'All surveys have ended or reached their response limit',
+        suggestion: 'Check the "All" tab to see completed surveys'
+      };
+    } else if (activeTab === 'ended') {
+      return {
+        title: 'No Ended Surveys',
+        desc: 'All surveys are still active',
+        suggestion: 'Check the "Active" tab for available surveys'
+      };
+    } else {
+      return {
+        title: 'No surveys found',
+        desc: 'Try adjusting your filters or check back later',
+        suggestion: ''
+      };
     }
   };
 
   return (
-    <Flex direction="column" gap="3">
-      {/* Header with Stats */}
-      <Card>
-        <Flex justify="between" align="center">
-          <div>
-            <Text size="5" weight="bold">All Surveys</Text>
-            <Flex gap="4" mt="2">
-              <Text size="2" color="gray">
-                Total: <Text weight="bold">{stats.totalSurveys}</Text>
-              </Text>
-              <Text size="2" color="gray">
-                Active: <Text weight="bold" color="green">{stats.activeSurveys}</Text>
-              </Text>
-              <Text size="2" color="gray">
-                Responses: <Text weight="bold">{stats.totalResponses}</Text>
-              </Text>
-            </Flex>
-          </div>
-          <Button 
-            onClick={fetchAllSurveys} 
-            disabled={loading}
-            variant="soft"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            {loading ? 'Loading...' : 'Refresh'}
-          </Button>
-        </Flex>
-      </Card>
+    <div className="vas-container">
+      {/* Header Tabs */}
+      <div className="vas-header-tabs">
+        <button 
+          className={`vas-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
+          onClick={() => setActiveTab('all')}
+        >
+          All ({stats.total})
+        </button>
+        <button 
+          className={`vas-tab-btn ${activeTab === 'active' ? 'active' : ''}`}
+          onClick={() => setActiveTab('active')}
+        >
+          Active ({stats.active})
+        </button>
+        <button 
+          className={`vas-tab-btn ${activeTab === 'ended' ? 'active' : ''}`}
+          onClick={() => setActiveTab('ended')}
+        >
+          Ended ({stats.ended})
+        </button>
+      </div>
 
-      {/* Filters */}
-      <Card>
-        <Flex gap="3" align="center" wrap="wrap">
-          <Flex align="center" gap="2">
-            <Filter size={16} />
-            <Text size="2">Filters:</Text>
-          </Flex>
-          
-          <TextField.Root
-            placeholder="Search surveys..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '200px' }}
-          >
-            <TextField.Slot>
-              <Search size={16} />
-            </TextField.Slot>
-          </TextField.Root>
+      {/* Filters Bar */}
+      <div className="vas-filters-bar">
+        <div className="vas-filters-left">
+          <div className="vas-search-box">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Search surveys..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           
           <select 
-            value={filterCategory} 
+            className="vas-filter-select"
+            value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--gray-6)' }}
           >
-            {categories.map(cat => (
+            {SURVEY_CATEGORIES.map(cat => (
               <option key={cat} value={cat}>
-                {cat === 'all' ? 'All Categories' : cat}
+                {cat}
               </option>
             ))}
           </select>
-          
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--gray-6)' }}
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active Only</option>
-            <option value="closed">Closed Only</option>
-          </select>
-          
-          <select
-            value={itemsPerPage}
-            onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--gray-6)' }}
-          >
-            <option value="6">6 per page</option>
-            <option value="12">12 per page</option>
-            <option value="24">24 per page</option>
-          </select>
-        </Flex>
-      </Card>
+        </div>
+        
+        <button 
+          className="vas-refresh-btn"
+          onClick={fetchAllSurveys}
+          disabled={loading}
+        >
+          <RefreshCw size={16} className={loading ? 'vas-spinning' : ''} />
+        </button>
+      </div>
 
-      {/* Survey Grid */}
-      {loading ? (
-        <Card>
-          <Text align="center" size="3">Loading surveys...</Text>
-        </Card>
-      ) : currentSurveys.length === 0 ? (
-        <Card>
-          <Text align="center" size="3">No surveys found</Text>
-        </Card>
-      ) : (
-        <Grid columns={{ initial: '1', sm: '2', md: '3' }} gap="3">
-          {currentSurveys.map(survey => (
-            <Card 
-              key={survey.id} 
-              style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-              className="hover:shadow-lg"
-              onClick={() => viewDetails(survey.id)}
-            >
-              <Flex direction="column" gap="2" height="100%">
-                <Flex justify="between" align="start">
-                  <Badge 
-                    size="1" 
-                    color={survey.isActive ? 'green' : 'gray'}
-                  >
-                    {survey.isActive ? 'Active' : 'Closed'}
-                  </Badge>
-                  <Badge size="1" variant="soft">
-                    {survey.category}
-                  </Badge>
-                </Flex>
-                
-                <div style={{ flex: 1 }}>
-                  <Text size="3" weight="bold" style={{ display: 'block', marginBottom: '8px' }}>
-                    {survey.title}
-                  </Text>
-                  <Text size="2" color="gray" style={{ 
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {survey.description}
-                  </Text>
+      {/* Table Header */}
+      <div className="vas-table-header">
+        <div className="vas-th-survey">Survey</div>
+        <div className="vas-th-category">Type</div>
+        <div className="vas-th-reward vas-sortable" onClick={() => {
+          setSortBy('reward');
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        }}>
+          <Coins size={14} />
+          Reward
+        </div>
+        <div className="vas-th-responses vas-sortable" onClick={() => {
+          setSortBy('responses');
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        }}>
+          <Users size={14} />
+          Responses
+        </div>
+        <div className="vas-th-progress">Progress</div>
+        <div className="vas-th-status">Status</div>
+        <div className="vas-th-actions">Actions</div>
+      </div>
+
+      {/* Survey Rows */}
+      <div className="vas-survey-list">
+        {loading ? (
+          // 骨架屏加载动画
+          <>
+            {[...Array(5)].map((_, index) => (
+              <SkeletonRow key={index} />
+            ))}
+          </>
+        ) : currentSurveys.length === 0 ? (
+          <div className="vas-empty-state">
+            <MessageSquare size={32} />
+            <span>{getEmptyMessage().title}</span>
+            <p>{getEmptyMessage().desc}</p>
+            {getEmptyMessage().suggestion && (
+              <p style={{ color: 'rgba(255, 255, 255, 0.6)', marginTop: '8px' }}>
+                💡 {getEmptyMessage().suggestion}
+              </p>
+            )}
+          </div>
+        ) : (
+          currentSurveys.map((survey) => {
+            const progress = getProgressPercentage(survey.currentResponses, survey.maxResponses);
+            const isFull = survey.currentResponses >= survey.maxResponses;
+            const isEnded = !survey.isActive || isFull;
+            
+            return (
+              <div key={survey.id} className="vas-survey-row">
+                <div className="vas-td-survey">
+                  <div className="vas-survey-info">
+                    <h3 className="vas-survey-title">{survey.title}</h3>
+                    <p className="vas-survey-desc">{survey.description}</p>
+                    {survey.createdAt && (
+                      <span className="vas-survey-date">
+                        <Calendar size={12} />
+                        {formatDate(survey.createdAt)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
-                <Flex direction="column" gap="1" mt="2">
-                  <Flex justify="between">
-                    <Text size="1" color="gray">Reward:</Text>
-                    <Text size="1" weight="bold">{formatSUI(survey.rewardPerResponse)} SUI</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="1" color="gray">Progress:</Text>
-                    <Text size="1">
-                      {survey.currentResponses}/{survey.maxResponses}
-                    </Text>
-                  </Flex>
-                  {survey.createdAt && (
-                    <Flex justify="between">
-                      <Text size="1" color="gray">Created:</Text>
-                      <Text size="1">{formatDate(survey.createdAt)}</Text>
-                    </Flex>
-                  )}
-                </Flex>
+                <div className="vas-td-category">
+                  <span className="vas-category-badge">
+                    {getCategoryIcon(survey.category)}
+                    {survey.category}
+                  </span>
+                </div>
                 
-                <Button size="2" variant="soft" style={{ marginTop: '8px' }}>
-                  View Details →
-                </Button>
-              </Flex>
-            </Card>
-          ))}
-        </Grid>
-      )}
+                <div className="vas-td-reward">
+                  <div className="vas-reward-amount">
+                    <Coins size={16} />
+                    <span>{formatSUI(survey.rewardPerResponse)}</span>
+                    <span className="vas-reward-unit">SUI</span>
+                  </div>
+                </div>
+                
+                <div className="vas-td-responses">
+                  <span className="vas-responses-count">
+                    {survey.currentResponses}/{survey.maxResponses}
+                  </span>
+                  {progress > 80 && !isEnded && <span className="vas-hot-badge">🔥</span>}
+                </div>
+                
+                <div className="vas-td-progress">
+                  <div className="vas-progress-bar">
+                    <div 
+                      className="vas-progress-fill"
+                      style={{ 
+                        width: `${progress}%`,
+                        backgroundColor: isEnded ? '#6b7280' : (progress > 80 ? '#ef4444' : '#10b981')
+                      }}
+                    />
+                  </div>
+                  <span className="vas-progress-text">{progress}%</span>
+                </div>
+                
+                <div className="vas-td-status">
+                  {isEnded ? (
+                    <span className="vas-status-badge closed">
+                      <Clock size={14} /> Ended
+                    </span>
+                  ) : (
+                    <span className="vas-status-badge active">
+                      <CheckCircle size={14} /> Active
+                    </span>
+                  )}
+                </div>
+                
+                <div className="vas-td-actions">
+                  <button 
+                    className="vas-action-btn secondary"
+                    onClick={() => navigate(`/app/survey/${survey.id}`)}
+                    title="View Details"
+                  >
+                    <Eye size={14} />
+                    View
+                  </button>
+                  {!isEnded && (
+                    <button 
+                      className="vas-action-btn primary"
+                      onClick={() => navigate(`/app/answer/${survey.id}`)}
+                      title="Answer Survey"
+                    >
+                      <Edit3 size={14} />
+                      Answer
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <Card>
-          <Flex justify="between" align="center">
-            <Text size="2" color="gray">
-              Showing {startIndex + 1}-{Math.min(endIndex, filteredSurveys.length)} of {filteredSurveys.length} surveys
-            </Text>
-            
-            <Flex gap="2" align="center">
-              <Button 
-                size="2" 
-                variant="soft"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft size={16} />
-              </Button>
-              
-              <Flex gap="1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  return (
-                    <Button
-                      key={i}
-                      size="2"
-                      variant={pageNum === currentPage ? 'solid' : 'soft'}
-                      onClick={() => setCurrentPage(pageNum)}
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-              </Flex>
-              
-              <Button 
-                size="2" 
-                variant="soft"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </Flex>
-          </Flex>
-        </Card>
+      {!loading && totalPages > 1 && (
+        <div className="vas-pagination">
+          <button 
+            className="vas-page-btn"
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          
+          <span className="vas-page-info">
+            Page {currentPage} of {totalPages}
+          </span>
+          
+          <button 
+            className="vas-page-btn"
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       )}
-    </Flex>
+    </div>
   );
 }
+
+export default ViewAllSurveys;

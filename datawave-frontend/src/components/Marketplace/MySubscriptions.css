@@ -1,0 +1,947 @@
+/* MySubscriptions.css */
+
+/* ========================================
+   Container & Base Layout
+   ======================================== */
+.ms-container {
+  width: 100%;
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: #ffffff;
+  padding: 20px;
+}
+
+/* ========================================
+   Connect Wallet State
+   ======================================== */
+.ms-connect-wallet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.8), rgba(20, 20, 35, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 48px;
+  backdrop-filter: blur(20px);
+}
+
+.ms-connect-wallet svg {
+  color: #a78bfa;
+}
+
+.ms-connect-wallet h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.ms-connect-wallet p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin: 0;
+  max-width: 400px;
+}
+
+/* ========================================
+   Header Section
+   ======================================== */
+.ms-header {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.8), rgba(20, 20, 35, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.ms-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.ms-header-info {
+  flex: 1;
+}
+
+.ms-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+}
+
+.ms-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.ms-header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ========================================
+   Stats Grid
+   ======================================== */
+.ms-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.ms-stat-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.ms-stat-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+}
+
+.ms-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ms-stat-icon.blue {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.ms-stat-icon.green {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.ms-stat-icon.gray {
+  background: rgba(107, 114, 128, 0.1);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  color: #9ca3af;
+}
+
+.ms-stat-icon.purple {
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  color: #a78bfa;
+}
+
+.ms-stat-content {
+  flex: 1;
+}
+
+.ms-stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 4px;
+}
+
+.ms-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.ms-stat-value.success {
+  color: #10b981;
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+.ms-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.ms-btn.primary {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  color: white;
+}
+
+.ms-btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+}
+
+.ms-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.ms-btn.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.ms-btn.full {
+  flex: 1;
+  justify-content: center;
+}
+
+.ms-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ms-icon-btn {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ms-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ms-spinning {
+  animation: ms-spin 1s linear infinite;
+}
+
+@keyframes ms-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Tabs Section
+   ======================================== */
+.ms-tabs-section {
+  background: rgba(30, 30, 45, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.ms-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.ms-tab {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  position: relative;
+}
+
+.ms-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ms-tab.active {
+  color: #a78bfa;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+/* ========================================
+   Subscriptions Section
+   ======================================== */
+.ms-subscriptions-section {
+  min-height: 400px;
+}
+
+.ms-subscriptions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+/* Subscription Card */
+.ms-subscription-card {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.6), rgba(20, 20, 35, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ms-subscription-card.active:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.2);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.ms-subscription-card.expired {
+  opacity: 0.7;
+}
+
+.ms-subscription-card.expired:hover {
+  opacity: 0.85;
+  transform: translateY(-2px);
+}
+
+.ms-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ms-category-badge {
+  padding: 4px 10px;
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #a78bfa;
+  font-weight: 500;
+}
+
+.ms-status-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ms-status-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.ms-status-badge.expired {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.ms-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.ms-card-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ms-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.ms-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.ms-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ms-detail-label svg {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ms-detail-value {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+}
+
+.ms-detail-value.expired {
+  color: #ef4444;
+}
+
+.ms-time-remaining {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 10px;
+  color: #10b981;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ms-expired-info {
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.1);
+  border-radius: 10px;
+}
+
+.ms-expired-details {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ms-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+/* ========================================
+   Skeleton Loading
+   ======================================== */
+.ms-skeleton-card {
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.6), rgba(20, 20, 35, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ms-skeleton-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ms-skeleton-badge,
+.ms-skeleton-status,
+.ms-skeleton-title,
+.ms-skeleton-description,
+.ms-skeleton-detail,
+.ms-skeleton-timer,
+.ms-skeleton-button {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.05) 25%, 
+    rgba(255, 255, 255, 0.1) 50%, 
+    rgba(255, 255, 255, 0.05) 75%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: ms-skeleton-loading 1.5s infinite;
+}
+
+.ms-skeleton-badge {
+  width: 80px;
+  height: 24px;
+}
+
+.ms-skeleton-status {
+  width: 60px;
+  height: 24px;
+}
+
+.ms-skeleton-title {
+  width: 70%;
+  height: 20px;
+}
+
+.ms-skeleton-description {
+  width: 100%;
+  height: 32px;
+}
+
+.ms-skeleton-details {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-skeleton-detail {
+  height: 16px;
+}
+
+.ms-skeleton-timer {
+  height: 44px;
+}
+
+.ms-skeleton-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ms-skeleton-button {
+  flex: 1;
+  height: 36px;
+}
+
+.ms-skeleton-button.small {
+  flex: 0;
+  width: 36px;
+}
+
+@keyframes ms-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ========================================
+   Empty State
+   ======================================== */
+.ms-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+  background: rgba(30, 30, 45, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 48px;
+}
+
+.ms-empty-state svg {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.ms-empty-state h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  text-align: center;
+}
+
+.ms-empty-state p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin: 0;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* ========================================
+   Modal
+   ======================================== */
+.ms-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: ms-fade-in 0.2s;
+  backdrop-filter: blur(4px);
+  padding: 20px;
+}
+
+@keyframes ms-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ms-modal {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  max-width: 700px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: ms-scale-in 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes ms-scale-in {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.ms-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ms-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.ms-modal-close {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ms-modal-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ms-modal-content {
+  padding: 24px 32px;
+}
+
+.ms-modal-section {
+  margin-bottom: 24px;
+}
+
+.ms-modal-section:last-child {
+  margin-bottom: 0;
+}
+
+.ms-modal-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 16px 0;
+}
+
+.ms-modal-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ms-modal-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ms-modal-info-item:last-child {
+  border-bottom: none;
+}
+
+.ms-modal-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+  margin-right: 16px;
+}
+
+.ms-modal-value {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: right;
+  word-break: break-all;
+}
+
+.ms-modal-value code {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  background: rgba(124, 58, 237, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.ms-modal-value.expired {
+  color: #ef4444;
+}
+
+.ms-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 20px 32px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   Toast Notifications
+   ======================================== */
+.ms-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.ms-toast {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px 20px;
+  max-width: 360px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: ms-slide-in 0.3s ease-out;
+  pointer-events: auto;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+@keyframes ms-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.ms-toast.success {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.ms-toast.success > svg {
+  color: #10b981;
+}
+
+.ms-toast.error {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.ms-toast.error > svg {
+  color: #ef4444;
+}
+
+.ms-toast.warning {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.ms-toast.warning > svg {
+  color: #f59e0b;
+}
+
+.ms-toast.info {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.ms-toast.info > svg {
+  color: #3b82f6;
+}
+
+/* ========================================
+   Scrollbar Styling
+   ======================================== */
+.ms-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ms-modal::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.ms-modal::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.3);
+  border-radius: 4px;
+}
+
+.ms-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.5);
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+@media (max-width: 768px) {
+  .ms-container {
+    padding: 12px;
+  }
+  
+  .ms-header {
+    padding: 16px;
+  }
+  
+  .ms-header-content {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .ms-header-actions {
+    width: 100%;
+  }
+  
+  .ms-header-actions .ms-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .ms-title {
+    font-size: 20px;
+  }
+  
+  .ms-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .ms-tabs-section {
+    padding: 16px;
+  }
+  
+  .ms-tabs {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .ms-tab {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .ms-subscriptions-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .ms-modal {
+    margin: 16px;
+  }
+  
+  .ms-modal-header,
+  .ms-modal-content,
+  .ms-modal-actions {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  
+  .ms-modal-actions {
+    flex-direction: column;
+  }
+  
+  .ms-modal-actions .ms-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .ms-toast-container {
+    right: 10px;
+    left: 10px;
+  }
+  
+  .ms-toast {
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .ms-header {
+    border-radius: 12px;
+  }
+  
+  .ms-title {
+    font-size: 18px;
+  }
+  
+  .ms-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .ms-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .ms-modal-title {
+    font-size: 18px;
+  }
+}

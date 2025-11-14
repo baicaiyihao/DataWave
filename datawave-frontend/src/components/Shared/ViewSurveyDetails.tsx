@@ -1,11 +1,27 @@
-// View Survey Details Component
-// 查看问卷详情页面 - 接收 surveyId 参数
-
+// src/components/ViewSurveyDetails.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, Flex, Text, Badge, Button } from '@radix-ui/themes';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { ConfigService } from '../services/config';
-import { ChevronLeft, Coins, Users, Calendar, ClipboardList, CheckCircle } from 'lucide-react';
+import { 
+  ChevronLeft, 
+  Coins, 
+  Users, 
+  Calendar, 
+  ClipboardList, 
+  CheckCircle,
+  Clock,
+  Award,
+  Hash,
+  User,
+  AlertCircle,
+  TrendingUp,
+  Radio,
+  CheckSquare,
+  Type,
+  Wallet
+} from 'lucide-react';
+import './ViewSurveyDetails.css';
 
 interface Question {
   question_text: string;
@@ -26,23 +42,34 @@ interface SurveyFullDetails {
   creator?: string;
 }
 
-interface ViewSurveyDetailsProps {
-  surveyId?: string;
-  onBack?: () => void;
-}
-
-export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurveyDetailsProps) {
+export function ViewSurveyDetails() {
+  const { surveyId } = useParams<{ surveyId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   
-  // 可以通过 props 传入 surveyId，或者从 URL 参数获取
-  const [surveyId, setSurveyId] = useState(propSurveyId || '');
   const [surveyDetails, setSurveyDetails] = useState<SurveyFullDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasAnswered, setHasAnswered] = useState(false);
 
-  // 获取问卷详情
+  // Smart navigation - returns to the previous page
+  const goBack = () => {
+    // Check if there's a previous page in history
+    if (location.key !== 'default') {
+      navigate(-1);
+    } else {
+      // Default fallback to marketplace
+      navigate('/app/marketplace');
+    }
+  };
+
+  const startAnsweringSurvey = () => {
+    navigate(`/app/answer/${surveyId}`);
+  };
+
+  // Fetch survey details
   const fetchSurveyDetails = async (id: string) => {
     if (!id) {
       setError('Survey ID is required');
@@ -55,7 +82,6 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
     setHasAnswered(false);
 
     try {
-      // 直接获取对象并解析
       const surveyObject = await suiClient.getObject({
         id,
         options: {
@@ -64,12 +90,10 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
         }
       });
 
-      console.log('Survey object:', surveyObject);
-
       if (surveyObject.data?.content && 'fields' in surveyObject.data.content) {
         const fields = surveyObject.data.content.fields;
         
-        // 解析问题数组
+        // Parse questions array
         const questions: Question[] = fields.questions?.map((q: any) => {
           const questionFields = q.fields || q;
           return {
@@ -82,7 +106,7 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
         const details: SurveyFullDetails = {
           title: fields.title || '',
           description: fields.description || '',
-          category: fields.category || '',
+          category: fields.category || 'Feedback',
           rewardPerResponse: fields.reward_per_response || '0',
           maxResponses: fields.max_responses || '0',
           currentResponses: fields.current_responses || '0',
@@ -93,9 +117,8 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
         };
 
         setSurveyDetails(details);
-        console.log('Parsed survey details:', details);
 
-        // 检查用户是否已回答
+        // Check if user has answered
         if (currentAccount?.address && fields.respondents) {
           await checkIfAnswered(fields.respondents.fields?.id?.id, currentAccount.address);
         }
@@ -110,7 +133,7 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
     }
   };
 
-  // 检查用户是否已回答
+  // Check if user has answered
   const checkIfAnswered = async (respondentsTableId: string, userAddress: string) => {
     if (!respondentsTableId || !userAddress) return;
 
@@ -129,20 +152,22 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
     }
   };
 
-  // 当 surveyId 改变时自动加载详情
-  useEffect(() => {
-    if (propSurveyId && propSurveyId !== surveyId) {
-      setSurveyId(propSurveyId);
-    }
-  }, [propSurveyId]);
-
   useEffect(() => {
     if (surveyId) {
       fetchSurveyDetails(surveyId);
     }
-  }, [surveyId]);
+  }, [surveyId, currentAccount?.address]);
 
-  // 格式化函数
+  // Format functions
+  const getQuestionTypeIcon = (type: number) => {
+    switch (type) {
+      case 0: return <Radio size={16} />;
+      case 1: return <CheckSquare size={16} />;
+      case 2: return <Type size={16} />;
+      default: return <ClipboardList size={16} />;
+    }
+  };
+
   const getQuestionTypeLabel = (type: number) => {
     switch (type) {
       case 0: return 'Single Choice';
@@ -152,18 +177,17 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
     }
   };
 
-  const getQuestionTypeColor = (type: number): "blue" | "green" | "purple" | "gray" => {
-    switch (type) {
-      case 0: return 'blue';
-      case 1: return 'green';
-      case 2: return 'purple';
-      default: return 'gray';
-    }
-  };
-
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(parseInt(timestamp));
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    
+    return date.toLocaleDateString();
   };
 
   const formatSUI = (amount: string) => {
@@ -171,261 +195,246 @@ export function ViewSurveyDetails({ surveyId: propSurveyId, onBack }: ViewSurvey
   };
 
   const formatAddress = (address: string) => {
-    return `${address.slice(0, 8)}...${address.slice(-6)}`;
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
   const completionRate = surveyDetails 
     ? (parseInt(surveyDetails.currentResponses) / parseInt(surveyDetails.maxResponses)) * 100 
     : 0;
 
+  // Loading state
   if (loading) {
     return (
-      <Card>
-        <Flex justify="center" align="center" py="5">
-          <Text size="3">Loading survey details...</Text>
-        </Flex>
-      </Card>
+      <div className="vsd-container">
+        <div className="vsd-loading-skeleton">
+          <div className="vsd-skeleton-header"></div>
+          <div className="vsd-skeleton-content"></div>
+          <div className="vsd-skeleton-content"></div>
+        </div>
+      </div>
     );
   }
 
+  // Error state
   if (error && !surveyDetails) {
     return (
-      <Card>
-        <Flex direction="column" gap="3" align="center" py="5">
-          <Text size="3" color="red">Error: {error}</Text>
-          {onBack && (
-            <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> Go Back
-            </Button>
-          )}
-        </Flex>
-      </Card>
+      <div className="vsd-container">
+        <div className="vsd-error-card">
+          <AlertCircle size={48} />
+          <h3>Unable to Load Survey</h3>
+          <p>{error}</p>
+          <button className="vsd-btn-primary" onClick={goBack}>
+            <ChevronLeft size={16} /> Go Back
+          </button>
+        </div>
+      </div>
     );
   }
 
+  // No survey found
   if (!surveyDetails) {
     return (
-      <Card>
-        <Flex direction="column" gap="3" align="center" py="5">
-          <Text size="3">No survey details available</Text>
-          {onBack && (
-            <Button onClick={onBack} variant="soft">
-              <ChevronLeft size={16} /> Go Back
-            </Button>
-          )}
-        </Flex>
-      </Card>
+      <div className="vsd-container">
+        <div className="vsd-error-card">
+          <AlertCircle size={48} />
+          <h3>Survey Not Found</h3>
+          <p>This survey doesn't exist or has been removed.</p>
+          <button className="vsd-btn-primary" onClick={goBack}>
+            <ChevronLeft size={16} /> Go Back
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Flex direction="column" gap="3">
-      {/* Navigation */}
-      {onBack && (
-        <Card>
-          <Flex justify="between" align="center">
-            <Button onClick={onBack} variant="ghost">
-              <ChevronLeft size={16} /> Back to All Surveys
-            </Button>
-            <Text size="2" color="gray">
-              Survey ID: {formatAddress(surveyId)}
-            </Text>
-          </Flex>
-        </Card>
-      )}
+    <div className="vsd-container">
+      {/* Navigation Bar */}
+      <div className="vsd-nav-bar">
+        <button className="vsd-back-btn" onClick={goBack}>
+          <ChevronLeft size={20} />
+          Back
+        </button>
+        <div className="vsd-survey-id">
+          <Hash size={14} />
+          <span>{formatAddress(surveyId || '')}</span>
+        </div>
+      </div>
 
-      {/* Header */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="start">
-            <div style={{ flex: 1 }}>
-              <Text size="6" weight="bold">{surveyDetails.title}</Text>
-              <Text size="3" color="gray" style={{ marginTop: '8px' }}>
-                {surveyDetails.description}
-              </Text>
-            </div>
-            <Badge size="2" color={surveyDetails.isActive ? 'green' : 'gray'}>
-              {surveyDetails.isActive ? 'Active' : 'Closed'}
-            </Badge>
-          </Flex>
-
-          <Flex gap="3" wrap="wrap">
-            <Badge variant="soft" size="2">{surveyDetails.category}</Badge>
-            <Badge variant="soft" size="2" color="blue">
-              <Coins size={14} style={{ marginRight: '4px' }} />
-              {formatSUI(surveyDetails.rewardPerResponse)} SUI
-            </Badge>
-            <Badge variant="soft" size="2" color="orange">
-              <Users size={14} style={{ marginRight: '4px' }} />
-              {surveyDetails.currentResponses}/{surveyDetails.maxResponses} Responses
-            </Badge>
-            <Badge variant="soft" size="2" color="purple">
-              <ClipboardList size={14} style={{ marginRight: '4px' }} />
-              {surveyDetails.questions.length} Questions
-            </Badge>
-          </Flex>
-
-          <Flex direction="column" gap="2">
-            <Text size="2" color="gray">
-              <Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} />
-              Created: {formatTimestamp(surveyDetails.createdAt)}
-            </Text>
-            {surveyDetails.creator && (
-              <Text size="2" color="gray">
-                Creator: {formatAddress(surveyDetails.creator)}
-              </Text>
-            )}
-          </Flex>
-
-          {hasAnswered && (
-            <Badge size="2" color="green">
-              <CheckCircle size={14} style={{ marginRight: '4px' }} />
-              You have already answered this survey
-            </Badge>
-          )}
-        </Flex>
-      </Card>
-
-      {/* Progress and Statistics */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Text size="4" weight="bold">Progress & Statistics</Text>
-          
-          {/* Progress Bar */}
-          <div>
-            <Flex justify="between" mb="2">
-              <Text size="2" color="gray">Completion Progress</Text>
-              <Text size="2" weight="bold">{completionRate.toFixed(1)}%</Text>
-            </Flex>
-            <div style={{ 
-              width: '100%', 
-              height: '8px', 
-              backgroundColor: 'var(--gray-4)', 
-              borderRadius: '4px',
-              overflow: 'hidden'
-            }}>
-              <div style={{ 
-                width: `${completionRate}%`, 
-                height: '100%', 
-                backgroundColor: completionRate === 100 ? 'var(--green-9)' : 'var(--blue-9)',
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
+      {/* Survey Header */}
+      <div className="vsd-survey-header">
+        <div className="vsd-header-content">
+          <div className="vsd-header-main">
+            <h1 className="vsd-survey-title">{surveyDetails.title}</h1>
+            <p className="vsd-survey-description">{surveyDetails.description}</p>
           </div>
-          
-          <Flex direction="column" gap="2">
-            <Flex justify="between">
-              <Text size="2" color="gray">Total Reward Pool:</Text>
-              <Text size="2" weight="bold">
-                {formatSUI((parseInt(surveyDetails.rewardPerResponse) * parseInt(surveyDetails.maxResponses)).toString())} SUI
-              </Text>
-            </Flex>
-            
-            <Flex justify="between">
-              <Text size="2" color="gray">Distributed Rewards:</Text>
-              <Text size="2" weight="bold" color="green">
-                {formatSUI((parseInt(surveyDetails.rewardPerResponse) * parseInt(surveyDetails.currentResponses)).toString())} SUI
-              </Text>
-            </Flex>
-            
-            <Flex justify="between">
-              <Text size="2" color="gray">Remaining Rewards:</Text>
-              <Text size="2" weight="bold" color="blue">
-                {formatSUI((parseInt(surveyDetails.rewardPerResponse) * 
-                  (parseInt(surveyDetails.maxResponses) - parseInt(surveyDetails.currentResponses))).toString())} SUI
-              </Text>
-            </Flex>
-          </Flex>
-        </Flex>
-      </Card>
+          <div className="vsd-header-status">
+            <span className={`vsd-status-badge ${surveyDetails.isActive ? 'active' : 'closed'}`}>
+              {surveyDetails.isActive ? (
+                <>
+                  <CheckCircle size={14} /> Active
+                </>
+              ) : (
+                <>
+                  <Clock size={14} /> Closed
+                </>
+              )}
+            </span>
+          </div>
+        </div>
 
-      {/* Questions */}
-      <Card>
-        <Flex direction="column" gap="3">
-          <Text size="4" weight="bold">Survey Questions ({surveyDetails.questions.length})</Text>
-          
+        <div className="vsd-header-meta">
+          <div className="vsd-meta-item">
+            <span className="vsd-category-badge">{surveyDetails.category}</span>
+          </div>
+          <div className="vsd-meta-item">
+            <Coins size={16} />
+            <span className="vsd-reward-amount">{formatSUI(surveyDetails.rewardPerResponse)}</span>
+            <span className="vsd-reward-unit">SUI</span>
+          </div>
+          <div className="vsd-meta-item">
+            <Users size={16} />
+            <span>{surveyDetails.currentResponses}/{surveyDetails.maxResponses}</span>
+          </div>
+          <div className="vsd-meta-item">
+            <ClipboardList size={16} />
+            <span>{surveyDetails.questions.length} Questions</span>
+          </div>
+          <div className="vsd-meta-item">
+            <Calendar size={16} />
+            <span>{formatTimestamp(surveyDetails.createdAt)}</span>
+          </div>
+        </div>
+
+        {hasAnswered && (
+          <div className="vsd-answered-notice">
+            <CheckCircle size={16} />
+            <span>You have already completed this survey</span>
+          </div>
+        )}
+      </div>
+
+      {/* Progress Card */}
+      <div className="vsd-progress-card">
+        <h3 className="vsd-card-title">Survey Progress</h3>
+        
+        <div className="vsd-progress-stats">
+          <div className="vsd-stat-item">
+            <span className="vsd-stat-label">Completion</span>
+            <span className="vsd-stat-value">{completionRate.toFixed(1)}%</span>
+          </div>
+          <div className="vsd-stat-item">
+            <span className="vsd-stat-label">Total Pool</span>
+            <span className="vsd-stat-value">
+              {formatSUI((parseInt(surveyDetails.rewardPerResponse) * parseInt(surveyDetails.maxResponses)).toString())} SUI
+            </span>
+          </div>
+          <div className="vsd-stat-item">
+            <span className="vsd-stat-label">Distributed</span>
+            <span className="vsd-stat-value success">
+              {formatSUI((parseInt(surveyDetails.rewardPerResponse) * parseInt(surveyDetails.currentResponses)).toString())} SUI
+            </span>
+          </div>
+          <div className="vsd-stat-item">
+            <span className="vsd-stat-label">Remaining</span>
+            <span className="vsd-stat-value primary">
+              {formatSUI((parseInt(surveyDetails.rewardPerResponse) * 
+                (parseInt(surveyDetails.maxResponses) - parseInt(surveyDetails.currentResponses))).toString())} SUI
+            </span>
+          </div>
+        </div>
+
+        <div className="vsd-progress-bar">
+          <div 
+            className="vsd-progress-fill"
+            style={{ 
+              width: `${completionRate}%`,
+              backgroundColor: completionRate === 100 ? '#6b7280' : '#10b981'
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Questions Section */}
+      <div className="vsd-questions-section">
+        <h3 className="vsd-section-title">
+          Survey Questions
+          <span className="vsd-question-count">{surveyDetails.questions.length}</span>
+        </h3>
+        
+        <div className="vsd-questions-list">
           {surveyDetails.questions.map((question, index) => (
-            <Card key={index} style={{ backgroundColor: 'var(--gray-2)' }}>
-              <Flex direction="column" gap="2">
-                <Flex justify="between" align="start">
-                  <Text size="3" weight="bold">
-                    Question {index + 1}
-                  </Text>
-                  <Badge color={getQuestionTypeColor(question.question_type)}>
-                    {getQuestionTypeLabel(question.question_type)}
-                  </Badge>
-                </Flex>
-                
-                <Text size="3">{question.question_text}</Text>
-                
-                {/* Options for choice questions */}
-                {question.question_type !== 2 && question.options.length > 0 && (
-                  <Flex direction="column" gap="1" style={{ marginTop: '8px', marginLeft: '16px' }}>
-                    {question.options.map((option, optIndex) => (
-                      <Flex key={optIndex} gap="2" align="center">
-                        <Text size="2" color="gray">
-                          {question.question_type === 0 ? '○' : '□'}
-                        </Text>
-                        <Text size="2">{option}</Text>
-                      </Flex>
-                    ))}
-                  </Flex>
-                )}
-                
-                {/* Text answer indicator */}
-                {question.question_type === 2 && (
-                  <Card style={{ marginTop: '8px', backgroundColor: 'var(--gray-3)' }}>
-                    <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
-                      📝 Text answer required
-                    </Text>
-                  </Card>
-                )}
-              </Flex>
-            </Card>
+            <div key={index} className="vsd-question-card">
+              <div className="vsd-question-header">
+                <div className="vsd-question-number">Q{index + 1}</div>
+                <div className="vsd-question-type">
+                  {getQuestionTypeIcon(question.question_type)}
+                  <span>{getQuestionTypeLabel(question.question_type)}</span>
+                </div>
+              </div>
+              
+              <p className="vsd-question-text">{question.question_text}</p>
+              
+              {/* Options for choice questions */}
+              {question.question_type !== 2 && question.options.length > 0 && (
+                <div className="vsd-question-options">
+                  {question.options.map((option, optIndex) => (
+                    <div key={optIndex} className="vsd-option-item">
+                      <span className="vsd-option-icon">
+                        {question.question_type === 0 ? '○' : '□'}
+                      </span>
+                      <span className="vsd-option-text">{option}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Text answer indicator */}
+              {question.question_type === 2 && (
+                <div className="vsd-text-answer-indicator">
+                  <Type size={14} />
+                  <span>Text answer required</span>
+                </div>
+              )}
+            </div>
           ))}
-        </Flex>
-      </Card>
+        </div>
+      </div>
 
-      {/* Action Button */}
-      <Card>
-        <Flex direction="column" gap="2">
-          {surveyDetails.isActive && 
-           parseInt(surveyDetails.currentResponses) < parseInt(surveyDetails.maxResponses) && 
-           !hasAnswered && 
-           currentAccount ? (
-            <Button 
-              size="3" 
-              style={{ width: '100%' }}
-              onClick={() => {
-                // 触发跳转到答题页面
-                const event = new CustomEvent('startAnswerSurvey', { 
-                  detail: { surveyId } 
-                });
-                window.dispatchEvent(event);
-              }}
-            >
-              Answer Survey & Earn {formatSUI(surveyDetails.rewardPerResponse)} SUI →
-            </Button>
-          ) : hasAnswered ? (
-            <Button size="3" disabled style={{ width: '100%' }}>
-              <CheckCircle size={16} style={{ marginRight: '8px' }} />
-              Already Answered
-            </Button>
-          ) : !currentAccount ? (
-            <Button size="3" disabled style={{ width: '100%' }}>
-              Connect Wallet to Answer
-            </Button>
-          ) : !surveyDetails.isActive ? (
-            <Button size="3" disabled style={{ width: '100%' }}>
-              Survey Closed
-            </Button>
-          ) : (
-            <Button size="3" disabled style={{ width: '100%' }}>
-              Survey Full
-            </Button>
-          )}
-        </Flex>
-      </Card>
-    </Flex>
+      {/* Action Section */}
+      <div className="vsd-action-section">
+        {surveyDetails.isActive && 
+         parseInt(surveyDetails.currentResponses) < parseInt(surveyDetails.maxResponses) && 
+         !hasAnswered && 
+         currentAccount ? (
+          <button className="vsd-action-btn primary" onClick={startAnsweringSurvey}>
+            <Award size={18} />
+            Answer Survey & Earn {formatSUI(surveyDetails.rewardPerResponse)} SUI
+          </button>
+        ) : hasAnswered ? (
+          <button className="vsd-action-btn disabled" disabled>
+            <CheckCircle size={18} />
+            Already Answered
+          </button>
+        ) : !currentAccount ? (
+          <button className="vsd-action-btn connect" disabled>
+            <Wallet size={18} />
+            Connect Wallet to Answer
+          </button>
+        ) : !surveyDetails.isActive ? (
+          <button className="vsd-action-btn disabled" disabled>
+            <Clock size={18} />
+            Survey Closed
+          </button>
+        ) : (
+          <button className="vsd-action-btn disabled" disabled>
+            <Users size={18} />
+            Survey Full
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
+
+export default ViewSurveyDetails;

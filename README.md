@@ -174,12 +174,11 @@ Set Revenue     │                  │      Consent to Share
 
 - ✅ Fully functional MVP deployed on Sui testnet
 - ✅ 100% on-chain survey lifecycle
-- ✅ Working encryption/decryption with Walrus
+- ✅ Encrypted data storage on Walrus decentralized network
+- ✅ Working encryption/decryption with Seal protocol
 - ✅ Complete frontend with wallet integration
 - ✅ Gas-optimized smart contracts
 - ✅ Flexible revenue sharing models
-- ✅ Real-time analytics dashboard
-- ✅ Anti-sybil mechanisms implemented
 - ✅ Mobile-responsive design
 - ✅ Multi-language support ready
 
@@ -216,7 +215,7 @@ npm run dev
 ### Smart Contract Deployment
 ```bash
 # Navigate to contracts
-cd datawave-contracts
+cd datawave
 
 # Build contracts
 sui move build
@@ -225,13 +224,14 @@ sui move build
 sui client publish --gas-budget 100000000
 ```
 
-## 📊 Metrics & Impact
+## 📊 Market Opportunity
 
-- **Target Market**: $80B+ global survey market
-- **Web3 Adoption**: 300M+ crypto users worldwide
-- **Growth Potential**: 45% CAGR in blockchain analytics
-- **Cost Reduction**: 70% lower than traditional survey platforms
-- **Speed**: Instant payments vs 30-90 day traditional cycles
+- **Growing demand** for transparent, fair market research solutions
+- **Expanding Web3 ecosystem** seeking native research tools
+- **Instant payments** replacing traditional delayed compensation
+- **Lower operational costs** through smart contract automation
+- **Global accessibility** without geographic or banking restrictions
+- **Data sovereignty** addressing increasing privacy concerns
 
 
 ## 📄 License
@@ -241,4 +241,4 @@ MIT License - see LICENSE file for details
 
 **DataWave: Where Your Opinion Has Real Value**
 
-*Built with ❤️ for the Walrus Hackathon 2025*
+*Built with ❤️ for the Walrus Haulout Hackathon 2025*

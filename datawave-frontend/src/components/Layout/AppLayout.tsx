@@ -117,12 +117,12 @@ const AppLayout: React.FC = () => {
       labelZh: '',
       icon: null
     },
-    {
-      path: '/settings',
-      label: 'Settings',
-      labelZh: '设置',
-      icon: <Settings size={18} />
-    }
+    // {
+    //   path: '/settings',
+    //   label: 'Settings',
+    //   labelZh: '设置',
+    //   icon: <Settings size={18} />
+    // }
   ];
 
   const t = (en: string, zh: string) => language === 'en' ? en : zh;

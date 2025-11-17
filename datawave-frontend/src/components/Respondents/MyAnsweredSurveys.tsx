@@ -1,11 +1,10 @@
 // src/components/Respondent/MyAnsweredSurveys.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
 import { 
   CheckCircle,
-  Clock,
   Award,
   FileText,
   Calendar,
@@ -13,12 +12,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Filter,
   Eye,
   Coins,
   Hash,
   X,
-  User,
   Shield,
   TrendingUp,
   AlertCircle,
@@ -85,20 +82,6 @@ export function MyAnsweredSurveys() {
     uniqueCreators: 0,
   });
 
-  // Toast notifications
-  const [toasts, setToasts] = useState<Array<{
-    id: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    message: string;
-  }>>([]);
-
-  const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
-    const id = Date.now().toString();
-    setToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(toast => toast.id !== id));
-    }, 3000);
-  };
 
   // Load user's answered surveys
   const loadAnsweredSurveys = async () => {
@@ -125,10 +108,11 @@ export function MyAnsweredSurveys() {
       
       // Process each answer event
       for (const event of userAnswers) {
-        const eventData = event.parsedJson;
+        const eventData = event.parsedJson as any;
         if (!eventData) continue;
         
         const surveyId = eventData.survey_id;
+        if (!surveyId) continue;
         
         // Avoid duplicates
         if (processedSurveys.has(surveyId)) continue;
@@ -222,10 +206,8 @@ export function MyAnsweredSurveys() {
         uniqueCreators: creators,
       });
       
-      showToast('success', `Loaded ${answered.length} answered surveys`);
     } catch (error) {
       console.error('Error loading answered surveys:', error);
-      showToast('error', 'Failed to load answered surveys');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -698,19 +680,6 @@ export function MyAnsweredSurveys() {
           </div>
         </div>
       )}
-
-      {/* Toast Notifications
-      <div className="mas-toast-container">
-        {toasts.map(toast => (
-          <div key={toast.id} className={`mas-toast ${toast.type}`}>
-            {toast.type === 'success' && <CheckCircle size={16} />}
-            {toast.type === 'error' && <AlertCircle size={16} />}
-            {toast.type === 'warning' && <AlertCircle size={16} />}
-            {toast.type === 'info' && <AlertCircle size={16} />}
-            <span>{toast.message}</span>
-          </div>
-        ))}
-      </div> */}
     </div>
   );
 }

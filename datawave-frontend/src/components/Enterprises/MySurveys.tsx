@@ -1,5 +1,5 @@
 // src/components/Enterprise/MySurveys.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
@@ -11,7 +11,6 @@ import {
   Eye, 
   Settings,
   RefreshCw,
-  Copy,
   ExternalLink,
   CheckCircle,
   DollarSign,
@@ -23,10 +22,7 @@ import {
   Package,
   Wallet,
   AlertCircle,
-  Shield,
   X,
-  Hash,
-  ChevronRight
 } from 'lucide-react';
 import './MySurveys.css';
 
@@ -211,8 +207,9 @@ export function MySurveys() {
         });
 
         if (registry.data?.content && 'fields' in registry.data.content) {
-          const fields = registry.data.content.fields;
-          const surveysByCreatorTable = fields.surveys_by_creator?.fields?.id?.id;
+          // 使用类型断言处理Move结构体
+          const fields = registry.data.content.fields as any;
+          const surveysByCreatorTable = fields?.surveys_by_creator?.fields?.id?.id;
           
           if (surveysByCreatorTable) {
             try {
@@ -225,7 +222,9 @@ export function MySurveys() {
               });
               
               if (creatorField.data?.content && 'fields' in creatorField.data.content) {
-                const surveyIds = creatorField.data.content.fields.value || [];
+                // 使用类型断言处理creatorField的fields
+                const creatorFieldData = creatorField.data.content.fields as any;
+                const surveyIds = creatorFieldData.value || [];
                 
                 for (const surveyId of surveyIds) {
                   if (!surveyIdSet.has(surveyId)) {
@@ -283,14 +282,7 @@ export function MySurveys() {
       });
       
       setMySurveys(allSurveys);
-      
-      // Calculate stats
-      const completedSurveys = allSurveys.filter(s => {
-        const current = parseInt(s.currentResponses || '0');
-        const max = parseInt(s.maxResponses || '0');
-        return max > 0 && current >= max;
-      }).length;
-      
+            
       const trulyActiveSurveys = allSurveys.filter(s => {
         const current = parseInt(s.currentResponses || '0');
         const max = parseInt(s.maxResponses || '0');
@@ -361,12 +353,6 @@ export function MySurveys() {
   const formatDate = (timestamp: string) => {
     const date = new Date(parseInt(timestamp));
     return date.toLocaleDateString();
-  };
-
-  const formatDuration = (ms: number) => {
-    const hours = ms / (1000 * 60 * 60);
-    if (hours < 24) return `${hours}h`;
-    return `${Math.floor(hours / 24)}d`;
   };
 
   const getCompletionRate = (current: string, max: string) => {
@@ -699,7 +685,7 @@ export function MySurveys() {
         )}
       </div>
 
-      {/* Toast Notifications
+      {/* Toast Notifications */}
       <div className="mys-toast-container">
         {toasts.map(toast => (
           <div key={toast.id} className={`mys-toast ${toast.type}`}>
@@ -710,7 +696,7 @@ export function MySurveys() {
             <span>{toast.message}</span>
           </div>
         ))}
-      </div> */}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 // App.tsx - 修复钱包持久化的版本
-import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit';
 import { getFullnodeUrl } from '@mysten/sui/client';
@@ -67,7 +66,7 @@ function App() {
                 <Route path="create-survey" element={<MerchantCreateSurvey />} />
                 <Route path="my-surveys" element={<MySurveys />} />
                 <Route path="manage/:surveyId" element={<SurveyManagementPage />} />
-                <Route path="analytics" element={<SurveyDecryption />} />
+                <Route path="analytics/:surveyId" element={<SurveyDecryption />} />
                 
                 {/* Subscription Routes */}
                 <Route path="subscriptions" element={<BrowseSubscriptions />} />

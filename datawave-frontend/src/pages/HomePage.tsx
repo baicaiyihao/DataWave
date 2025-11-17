@@ -6,38 +6,23 @@ import {
   ArrowRight,
   Shield,
   Zap,
-  Globe,
   Lock,
   Users,
   BarChart3,
   Database,
-  Award,
   CheckCircle,
-  TrendingUp,
-  Layers,
-  Code,
   DollarSign,
-  Activity,
-  Star,
-  ChevronRight,
-  Play,
   Github,
   Twitter,
   MessageCircle,
-  FileText,
   Sparkles,
   Building,
-  CreditCard,
-  UserCheck,
   Target,
   Gift,
   Coins,
   Share2,
   PieChart,
-  ArrowDown,
-  Wallet,
   FileQuestion,
-  TrendingDown,
   Clock,
   Languages
 } from 'lucide-react';
@@ -494,7 +479,7 @@ const translations = {
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { scrollYProgress } = useScroll();
-  const [activeFeature, setActiveFeature] = useState(0);
+  const [, setActiveFeature] = useState(0);
   const [language, setLanguage] = useState<'en' | 'zh'>('en'); // Default to English
   
   const t = translations[language];

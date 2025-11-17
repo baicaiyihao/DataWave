@@ -1,8 +1,7 @@
 // src/components/ViewSurveyDetails.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
-import { ConfigService } from '../services/config';
 import { 
   ChevronLeft, 
   Coins, 
@@ -13,9 +12,7 @@ import {
   Clock,
   Award,
   Hash,
-  User,
   AlertCircle,
-  TrendingUp,
   Radio,
   CheckSquare,
   Type,
@@ -91,7 +88,7 @@ export function ViewSurveyDetails() {
       });
 
       if (surveyObject.data?.content && 'fields' in surveyObject.data.content) {
-        const fields = surveyObject.data.content.fields;
+        const fields = surveyObject.data.content.fields as any;
         
         // Parse questions array
         const questions: Question[] = fields.questions?.map((q: any) => {

@@ -1,15 +1,13 @@
 // src/components/Enterprise/SurveyManagementPage.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiClient, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
 import { ConfigService } from '../../services/config';
 import { 
-  Settings,
   Users,
   DollarSign,
   Shield,
-  Plus,
   Copy,
   ExternalLink,
   CheckCircle,
@@ -26,15 +24,13 @@ import {
   User,
   Calendar,
   ArrowLeft,
-  Lock,
   Unlock,
   BarChart3,
   CreditCard,
-  X,
-  Wallet,
-  FileText
+  X
 } from 'lucide-react';
 import './SurveyManagementPage.css';
+
 
 // Import the decryption component
 import { SurveyDecryption } from './SurveyDecryption';
@@ -281,12 +277,13 @@ export function SurveyManagementPage() {
             });
             
             const currentTime = Date.now();
+            
             for (const event of subscriptionEvents.data) {
-              if (event.parsedJson?.survey_id === surveyId) {
-                const eventData = event.parsedJson;
-                
+              const eventData = event.parsedJson as any;
+              if (eventData?.survey_id === surveyId) {
+                const eventData = event.parsedJson as any; // 添加类型断言
                 subscribers.push({
-                  address: eventData.subscriber,
+                  address: eventData.subscriber || '',
                   subscriptionId: event.id?.txDigest || 'Unknown',
                   createdAt: parseInt(event.timestampMs || '0'),
                   expiresAt: parseInt(eventData.expires_at || '0'),
@@ -341,9 +338,9 @@ export function SurveyManagementPage() {
     });
     
     signAndExecute(
-      { transaction: tx },
+      { transaction: tx as any},
       {
-        onSuccess: async (result) => {
+        onSuccess: async () => {
           showToast('success', 'Subscription service created successfully!');
           setShowCreateSubscription(false);
           setSubscriptionPrice('');
@@ -392,7 +389,7 @@ export function SurveyManagementPage() {
     });
     
     signAndExecute(
-      { transaction: tx },
+      { transaction: tx as any},
       {
         onSuccess: () => {
           showToast('success', 'Address added to allowlist');
@@ -435,7 +432,7 @@ export function SurveyManagementPage() {
     });
     
     signAndExecute(
-      { transaction: tx },
+      { transaction: tx as any},
       {
         onSuccess: () => {
           showToast('success', 'Address removed from allowlist');
@@ -715,7 +712,8 @@ export function SurveyManagementPage() {
                       <span className="sm-info-label">SurveyCap ID:</span>
                       <div className="sm-info-value">
                         <code>{survey.capId.slice(0, 16)}...</code>
-                        <button className="sm-copy-btn" onClick={() => copyToClipboard(survey.capId)}>
+                        <button className="sm-copy-btn" onClick={() => survey.capId && copyToClipboard(survey.capId)}
+>
                           <Copy size={14} />
                         </button>
                       </div>
@@ -727,7 +725,8 @@ export function SurveyManagementPage() {
                       <span className="sm-info-label">Subscription Service ID:</span>
                       <div className="sm-info-value">
                         <code>{survey.subscriptionServiceId.slice(0, 16)}...</code>
-                        <button className="sm-copy-btn" onClick={() => copyToClipboard(survey.subscriptionServiceId)}>
+                        <button className="sm-copy-btn" onClick={() => survey.subscriptionServiceId && copyToClipboard(survey.subscriptionServiceId)}
+>
                           <Copy size={14} />
                         </button>
                       </div>

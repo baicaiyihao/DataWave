@@ -1,5 +1,5 @@
 // src/components/Subscription/MySubscriptions.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
@@ -14,13 +14,10 @@ import {
   AlertCircle,
   FileText,
   Users,
-  TrendingUp,
   Wallet,
   DollarSign,
-  Shield,
   X,
   Hash,
-  ChevronRight,
   Package,
   ShoppingCart
 } from 'lucide-react';

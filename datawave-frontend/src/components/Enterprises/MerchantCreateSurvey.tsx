@@ -357,7 +357,8 @@ export function MerchantCreateSurvey() {
                 if (change.objectType.includes('::survey_system::Survey') &&
                     !change.objectType.includes('Field') &&
                     !change.objectType.includes('SurveyBasicInfo') &&
-                    !change.objectType.includes('Table')) {
+                    !change.objectType.includes('Table') &&
+                    !change.objectType.includes('Cap')) {
                   surveyId = change.objectId;
                   console.log('✅ Found Survey ID:', surveyId);
                   break;

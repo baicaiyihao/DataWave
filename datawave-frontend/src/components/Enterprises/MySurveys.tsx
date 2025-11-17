@@ -1,5 +1,5 @@
 // src/components/Enterprise/MySurveys.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
@@ -11,7 +11,6 @@ import {
   Eye, 
   Settings,
   RefreshCw,
-  Copy,
   ExternalLink,
   CheckCircle,
   DollarSign,
@@ -23,10 +22,7 @@ import {
   Package,
   Wallet,
   AlertCircle,
-  Shield,
   X,
-  Hash,
-  ChevronRight
 } from 'lucide-react';
 import './MySurveys.css';
 
@@ -286,14 +282,7 @@ export function MySurveys() {
       });
       
       setMySurveys(allSurveys);
-      
-      // Calculate stats
-      const completedSurveys = allSurveys.filter(s => {
-        const current = parseInt(s.currentResponses || '0');
-        const max = parseInt(s.maxResponses || '0');
-        return max > 0 && current >= max;
-      }).length;
-      
+            
       const trulyActiveSurveys = allSurveys.filter(s => {
         const current = parseInt(s.currentResponses || '0');
         const max = parseInt(s.maxResponses || '0');
@@ -364,12 +353,6 @@ export function MySurveys() {
   const formatDate = (timestamp: string) => {
     const date = new Date(parseInt(timestamp));
     return date.toLocaleDateString();
-  };
-
-  const formatDuration = (ms: number) => {
-    const hours = ms / (1000 * 60 * 60);
-    if (hours < 24) return `${hours}h`;
-    return `${Math.floor(hours / 24)}d`;
   };
 
   const getCompletionRate = (current: string, max: string) => {

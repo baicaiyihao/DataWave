@@ -285,6 +285,7 @@
   margin: 0 0 4px 0;
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -295,6 +296,7 @@
   margin: 0 0 4px 0;
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.4;
@@ -640,7 +642,8 @@
   
   .vas-survey-title,
   .vas-survey-desc {
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
   }
   
   .vas-td-category,

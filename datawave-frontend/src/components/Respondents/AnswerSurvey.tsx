@@ -1,5 +1,5 @@
 // src/components/AnswerSurvey.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSuiClient, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from "@mysten/sui/transactions";
@@ -15,9 +15,7 @@ import {
   CheckCircle,
   AlertCircle,
   Coins,
-  Wallet,
   Shield,
-  Info,
   Radio,
   CheckSquare,
   Type,
@@ -65,7 +63,6 @@ const WALRUS_SERVICES = [
 ];
 
 const MIN_GAS_BALANCE = 0.1; // 最小需要0.1 SUI来支付gas费
-const ESTIMATED_GAS_COST = 0.05; // 预估gas费用
 
 export function AnswerSurvey() {
   const { surveyId } = useParams<{ surveyId: string }>();
@@ -113,7 +110,7 @@ export function AnswerSurvey() {
     serviceAttempts: []
   });
 
-  const NUM_EPOCH = 1;
+  const NUM_EPOCH = 30;
 
   // 获取钱包余额
   const fetchWalletBalance = async () => {
@@ -149,7 +146,7 @@ export function AnswerSurvey() {
         const url = `${service.publisherUrl}/v1/blobs?epochs=${NUM_EPOCH}`;
         const response = await fetch(url, {
           method: 'PUT',
-          body: data,
+          body: data as BodyInit,
         });
 
         if (response.ok) {
@@ -195,7 +192,7 @@ export function AnswerSurvey() {
       });
 
       if (surveyObj.data?.content && 'fields' in surveyObj.data.content) {
-        const fields = surveyObj.data.content.fields;
+        const fields = surveyObj.data.content.fields as any;
         
         const questions = fields.questions?.map((q: any) => ({
           question_text: q.fields?.question_text || q.question_text || '',
@@ -355,6 +352,9 @@ export function AnswerSurvey() {
 
       // 2. 生成ID
       const nonce = crypto.getRandomValues(new Uint8Array(5));
+      if (!surveyId) {
+        throw new Error('Survey ID is required');
+      }
       const surveyIdBytes = fromHex(surveyId.replace(/^0x/, ''));
       const id = toHex(new Uint8Array([...surveyIdBytes, ...nonce]));
       

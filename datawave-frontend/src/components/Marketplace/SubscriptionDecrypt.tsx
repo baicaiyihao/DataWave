@@ -1,5 +1,5 @@
 // src/components/Marketplace/SubscriptionDecrypt.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiClient, useCurrentAccount, useSignPersonalMessage } from '@mysten/dapp-kit';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
@@ -13,9 +13,7 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
-  FileText,
   Users,
-  Calendar,
   Clock,
   Key,
   Eye,

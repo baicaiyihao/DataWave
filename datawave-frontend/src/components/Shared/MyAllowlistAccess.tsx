@@ -1,5 +1,5 @@
 // src/components/Access/MyAllowlistAccess.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { ConfigService } from '../../services/config';
@@ -15,12 +15,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Filter,
   Key,
   Wallet,
   CheckCircle,
-  AlertCircle,
-  Hash,
   Activity,
   Database
 } from 'lucide-react';
@@ -50,7 +47,6 @@ export function MyAllowlistAccess() {
   const navigate = useNavigate();
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
-  const packageId = ConfigService.getPackageId();
   
   const [surveys, setSurveys] = useState<AllowlistSurvey[]>([]);
   const [filteredSurveys, setFilteredSurveys] = useState<AllowlistSurvey[]>([]);
@@ -73,28 +69,13 @@ export function MyAllowlistAccess() {
     totalAnswers: 0,
   });
 
-  // Toast notifications
-  const [toasts, setToasts] = useState<Array<{
-    id: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    message: string;
-  }>>([]);
-
-  const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
-    const id = Date.now().toString();
-    setToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(toast => toast.id !== id));
-    }, 3000);
-  };
-
   // Navigation functions - Updated routes
   const viewSurveyDetails = (surveyId: string) => {
     navigate(`/app/survey/${surveyId}`);
   };
 
   const startDecryption = (surveyId: string) => {
-    navigate(`/app/analytics`); // Or specific decrypt page if needed
+    navigate(`/app/analytics/${surveyId}`); // Or specific decrypt page if needed
   };
 
   // Load surveys where user is in allowlist
@@ -113,7 +94,7 @@ export function MyAllowlistAccess() {
       });
 
       if (registry.data?.content && 'fields' in registry.data.content) {
-        const fields = registry.data.content.fields;
+        const fields = registry.data.content.fields as any;
         const allSurveysTable = fields.all_surveys?.fields?.id?.id;
         
         if (allSurveysTable) {
@@ -231,12 +212,9 @@ export function MyAllowlistAccess() {
         totalAnswers,
       });
       
-      if (!loading) {
-        showToast('success', `Found ${allowlistSurveys.length} surveys with allowlist access`);
-      }
+
     } catch (error) {
       console.error('Error loading allowlist surveys:', error);
-      showToast('error', 'Failed to load allowlist surveys');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -632,19 +610,6 @@ export function MyAllowlistAccess() {
           </div>
         </div>
       )}
-
-      {/* Toast Notifications */}
-      <div className="mal-toast-container">
-        {toasts.map(toast => (
-          <div key={toast.id} className={`mal-toast ${toast.type}`}>
-            {toast.type === 'success' && <CheckCircle size={16} />}
-            {toast.type === 'error' && <AlertCircle size={16} />}
-            {toast.type === 'warning' && <AlertCircle size={16} />}
-            {toast.type === 'info' && <AlertCircle size={16} />}
-            <span>{toast.message}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

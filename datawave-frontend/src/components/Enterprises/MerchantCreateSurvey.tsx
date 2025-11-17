@@ -1,5 +1,5 @@
 // src/components/Merchant/MerchantCreateSurvey.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSignAndExecuteTransaction, useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { Transaction } from "@mysten/sui/transactions";

@@ -140,7 +140,8 @@ export function ViewAllSurveys() {
       });
 
       if (registry.data?.content && 'fields' in registry.data.content) {
-        const fields = registry.data.content.fields;
+        const fields = registry.data.content.fields as any;
+
         const allSurveysTable = fields.all_surveys?.fields?.id?.id;
         
         if (allSurveysTable) {
@@ -163,12 +164,10 @@ export function ViewAllSurveys() {
                 });
                 
                 if (surveyObj.data?.content && 'fields' in surveyObj.data.content) {
-                  const surveyFields = surveyObj.data.content.fields;
+                  const surveyFields = surveyObj.data.content.fields as any;
                   
-                  // 确保类别是有效的调研类型
                   let category = surveyFields.category || 'Other';
                   if (!SURVEY_CATEGORIES.includes(category) || category === 'All Types') {
-                    // 如果是旧的分类，映射到新的分类
                     const categoryMap: Record<string, string> = {
                       'feedback': 'Feedback',
                       'DeFi': 'Research',

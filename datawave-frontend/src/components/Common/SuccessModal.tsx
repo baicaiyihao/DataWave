@@ -1,5 +1,5 @@
 // src/components/Common/SuccessModal.tsx
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, ExternalLink, Copy, ArrowRight } from 'lucide-react';
 import './SuccessModal.css';
 
@@ -16,7 +16,6 @@ interface SuccessModalProps {
 
 export function SuccessModal({
   isOpen,
-  onClose,
   surveyId,
   title,
   txDigest,

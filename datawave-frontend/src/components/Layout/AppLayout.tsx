@@ -4,17 +4,12 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ConnectButton, useCurrentAccount, useDisconnectWallet, useSuiClient } from '@mysten/dapp-kit';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  // Main Navigation Icons
-  Grid3x3,
-  PlusCircle,
-  TrendingUp,
   
   // Profile Menu Icons
   FileText,
   ClipboardList,
   ShoppingBag,
   CheckCircle,
-  Activity,
   Wallet,
   Settings,
   LogOut,
@@ -23,7 +18,6 @@ import {
   // UI Icons
   Menu,
   X,
-  Languages,
   User
 } from 'lucide-react';
 import '../../css/AppLayout.css';
@@ -52,7 +46,7 @@ const AppLayout: React.FC = () => {
   
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [language, setLanguage] = useState<'en' | 'zh'>('en');
+  const [language] = useState<'en' | 'zh'>('en');
   const [balance, setBalance] = useState<string>('--');
 
   // Main navigation items - similar to 
@@ -135,10 +129,6 @@ const AppLayout: React.FC = () => {
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
-  };
-
-  const toggleLanguage = () => {
-    setLanguage(prev => prev === 'en' ? 'zh' : 'en');
   };
 
   const formatAddress = (address: string) => {

@@ -1,5 +1,5 @@
 // src/components/BrowseSubscriptions.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuiClient, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
@@ -10,7 +10,6 @@ import {
   Users, 
   TrendingUp, 
   Search,
-  Filter,
   RefreshCw,
   CheckCircle,
   ShoppingCart,
@@ -22,7 +21,6 @@ import {
   Award,
   Zap,
   BarChart,
-  ArrowRight
 } from 'lucide-react';
 import './BrowseSubscriptions.css';
 
@@ -142,7 +140,7 @@ export function BrowseSubscriptions() {
       });
 
       if (registry.data?.content && 'fields' in registry.data.content) {
-        const fields = registry.data.content.fields;
+  const fields = registry.data.content.fields as any;
         const allSurveysTable = fields.all_surveys?.fields?.id?.id;
         
         if (allSurveysTable) {
@@ -310,7 +308,6 @@ export function BrowseSubscriptions() {
   // 购买订阅 - 成功后跳转
   const purchaseSubscription = (service: SubscriptionSurvey) => {
     if (!currentAccount?.address) {
-      const shouldConnect = confirm('Please connect your wallet to subscribe.\n\nWould you like to connect now?');
       return;
     }
     

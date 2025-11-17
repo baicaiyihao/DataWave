@@ -1,5 +1,5 @@
 // src/components/Enterprise/SurveyDecryption.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSignPersonalMessage, useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
 import { useParams } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
@@ -79,7 +79,6 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
   const [decryptedAnswers, setDecryptedAnswers] = useState<Map<string, DecryptedAnswer>>(new Map());
   const [showDecryptedDialog, setShowDecryptedDialog] = useState(false);
   const [currentDecryptedAnswer, setCurrentDecryptedAnswer] = useState<DecryptedAnswer | null>(null);
-  const [error, setError] = useState<string | null>(null);
   
   // Toast notifications
   const [toasts, setToasts] = useState<Array<{

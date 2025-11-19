@@ -1,17 +1,22 @@
-# DataWave - Decentralized Survey Intelligence Platform
+# DataWave - Decentralized Data Economy Infrastructure
 
-## 📝 Complete Project Introduction
+## 📝 Project Introduction
 
-**DataWave** is a revolutionary Web3 survey-to-earn platform built on Sui blockchain with Walrus decentralized storage, transforming how market research is conducted in the digital age. By leveraging blockchain technology, we create a trustless ecosystem where enterprises gather authentic insights, users earn cryptocurrency for their opinions, and data becomes a tradeable asset with transparent value distribution.
+**DataWave** is building the foundational infrastructure for a decentralized data economy on Sui blockchain with Walrus storage. We transform data from an extracted commodity into an economic asset class, where every piece of information has transparent, market-driven value that flows directly to its creators.
 
-Our platform addresses critical pain points in traditional survey systems: lack of transparency, unfair compensation, data privacy concerns, and centralized control. Through smart contracts, encrypted storage, and tokenized incentives, DataWave ensures every participant - from survey creators to respondents to data subscribers - benefits fairly from the value they create.
+While we begin with surveys as our first use case, DataWave's vision extends beyond fixing Web2's problems. We're creating a protocol where data becomes a new form of economy - users generate value through their information, enterprises access authentic insights through direct compensation, and data itself becomes a tradeable asset with perpetual returns.
 
-## 🎯 Core Value Proposition
+## 🎯 Core Vision: The Data Economy
 
-DataWave revolutionizes market research by creating a trustless, incentive-aligned ecosystem where:
-- **Enterprises** get authentic, verifiable user insights with guaranteed response quality
-- **Users** earn SUI tokens for sharing opinions while maintaining data privacy  
-- **Data buyers** access aggregated insights through subscription-based secondary markets
+Traditional data models are fundamentally broken - users create billions in value but capture none of it. DataWave introduces a revolutionary paradigm:
+
+**Data as Economic Assets**: Every piece of user data becomes a tradeable, income-generating asset with permanent ownership rights stored on Walrus.
+
+**Market-Driven Value**: Supply and demand, not corporate monopolies, determine data prices through transparent on-chain markets.
+
+**Perpetual Value Streams**: One-time data contributions generate lifetime returns through subscription models and secondary markets.
+
+**True Data Sovereignty**: Users maintain complete control over their data usage, monetization, and access permissions.
 
 ## 🔧 Technical Architecture
 
@@ -233,12 +238,24 @@ sui client publish --gas-budget 100000000
 - **Global accessibility** without geographic or banking restrictions
 - **Data sovereignty** addressing increasing privacy concerns
 
+## 🤝 Team
+
+- **Smart Contract Development**: Move language expertise
+- **Frontend Engineering**: React/TypeScript specialists  
+- **Blockchain Architecture**: DeFi protocol experience
+- **Product Design**: Web3 UX optimization
+
+## 📞 Contact & Links
+
+- **Demo**: [datawave.demo](https://datawave.wal.app)
 
 ## 📄 License
 
 MIT License - see LICENSE file for details
 
 
-**DataWave: Where Your Opinion Has Real Value**
+**DataWave: Building the Data Economy, One Asset at a Time**
+
+*Where data transforms from commodity to capital*
 
 *Built with ❤️ for the Walrus Haulout Hackathon 2025*

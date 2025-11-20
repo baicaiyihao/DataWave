@@ -21,7 +21,7 @@ import {
   Package,
   ShoppingCart
 } from 'lucide-react';
-import './MySubscriptions.css';
+import '../../css/MySubscriptions.css';
 
 interface UserSubscription {
   subscriptionId: string;

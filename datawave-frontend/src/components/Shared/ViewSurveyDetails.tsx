@@ -18,7 +18,7 @@ import {
   Type,
   Wallet
 } from 'lucide-react';
-import './ViewSurveyDetails.css';
+import '../../css/ViewSurveyDetails.css';
 
 interface Question {
   question_text: string;

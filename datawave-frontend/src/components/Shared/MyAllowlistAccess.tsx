@@ -21,7 +21,7 @@ import {
   Activity,
   Database
 } from 'lucide-react';
-import './MyAllowlistAccess.css';
+import '../../css/MyAllowlistAccess.css';
 
 interface AllowlistSurvey {
   id: string;

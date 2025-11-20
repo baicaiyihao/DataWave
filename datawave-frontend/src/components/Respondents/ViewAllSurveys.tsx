@@ -23,7 +23,7 @@ import {
   ShoppingCart,
   Briefcase
 } from 'lucide-react';
-import './ViewAllSurveys.css';
+import '../../css/ViewAllSurveys.css';
 
 interface SurveyBasicInfo {
   id: string;

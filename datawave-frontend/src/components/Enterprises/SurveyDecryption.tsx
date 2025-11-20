@@ -25,7 +25,7 @@ import {
   Clock
 } from 'lucide-react';
 import { set, get } from 'idb-keyval';
-import './SurveyDecryption.css';
+import '../../css/SurveyDecryption.css';
 
 const TTL_MIN = 10;
 
@@ -260,40 +260,83 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
     if (!sessionKey || !surveyId) return;
     
     const aggregators = [
-      'aggregator1',
-      'aggregator2',
-      'aggregator3',
-      'aggregator4',
-      'aggregator5',
-      'aggregator6',
+      'https://aggregator.walrus-testnet.walrus.space',
+      'https://wal-aggregator-testnet.staketab.org',
+      'https://walrus-testnet-aggregator.redundex.com',
+      'https://walrus-testnet-aggregator.nodes.guru',
+      'https://aggregator.walrus.banansen.dev',
+      'https://walrus-testnet-aggregator.everstake.one',
     ];
+    
+    // 带重试的下载函数
+    const downloadWithRetry = async (blobId: string, maxRetries = 3): Promise<{ blobId: string; data: ArrayBuffer } | null> => {
+      const attemptedAggregators = new Set<string>();
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        // 获取未尝试过的聚合器
+        const availableAggregators = aggregators.filter(a => !attemptedAggregators.has(a));
+        
+        if (availableAggregators.length === 0) {
+          console.error(`All aggregators failed for blob ${blobId}`);
+          break;
+        }
+        
+        // 随机选择一个未尝试过的聚合器
+        const randomIndex = Math.floor(Math.random() * availableAggregators.length);
+        const aggregator = availableAggregators[randomIndex];
+        attemptedAggregators.add(aggregator);
+        
+        try {
+          console.log(`Attempting download from ${aggregator.split('.')[1]} for blob ${blobId.slice(0, 10)}...`);
+          
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 10000);
+          
+          const aggregatorUrl = `${aggregator}/v1/blobs/${blobId}`;
+          const response = await fetch(aggregatorUrl, { 
+            signal: controller.signal,
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          
+          clearTimeout(timeout);
+          
+          if (response.ok) {
+            const data = await response.arrayBuffer();
+            console.log(`Successfully downloaded blob ${blobId.slice(0, 10)}... from ${aggregator.split('.')[1]}`);
+            return { blobId, data };
+          } else {
+            console.warn(`Failed to download from ${aggregator.split('.')[1]}: HTTP ${response.status}`);
+          }
+        } catch (err) {
+          const aggregatorName = aggregator.split('.')[1] || 'aggregator';
+          console.error(`Error downloading from ${aggregatorName}:`, err);
+        }
+      }
+      
+      return null;
+    };
+    
+    // 并行下载所有文件
+    console.log(`Starting download of ${blobIds.length} blobs...`);
     
     const downloadResults = await Promise.all(
       blobIds.map(async (blobId) => {
-        try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 10000);
-          const randomAggregator = aggregators[Math.floor(Math.random() * aggregators.length)];
-          const aggregatorUrl = `/${randomAggregator}/v1/blobs/${blobId}`;
-          const response = await fetch(aggregatorUrl, { signal: controller.signal });
-          clearTimeout(timeout);
-          if (!response.ok) {
-            return null;
-          }
-          return { blobId, data: await response.arrayBuffer() };
-        } catch (err) {
-          console.error(`Blob ${blobId} could not be downloaded`, err);
-          return null;
-        }
-      }),
+        return await downloadWithRetry(blobId);
+      })
     );
 
     const validDownloads = downloadResults.filter((result): result is { blobId: string; data: ArrayBuffer } => result !== null);
     
+    console.log(`Successfully downloaded ${validDownloads.length}/${blobIds.length} blobs`);
+    
     if (validDownloads.length === 0) {
-      throw new Error('Could not download any files');
+      throw new Error('Failed to download any files. All aggregator nodes might be unavailable.');
     }
 
+    // 批量获取密钥
     for (let i = 0; i < validDownloads.length; i += 10) {
       const batch = validDownloads.slice(i, i + 10);
       const ids = batch.map((item) => EncryptedObject.parse(new Uint8Array(item.data)).id);
@@ -312,7 +355,10 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
       }
     }
 
+    // 解密文件
     const decryptedData: DecryptedAnswer[] = [];
+    const failedDecryptions: string[] = [];
+    
     for (const { blobId, data } of validDownloads) {
       const fullId = EncryptedObject.parse(new Uint8Array(data)).id;
       const tx = new Transaction();
@@ -331,18 +377,21 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
         
         const blob = answerBlobs.find(b => b.blobId === blobId);
         if (blob) {
-          decryptedData.push({
+          const decryptedAnswer = {
             surveyId: answerData.surveyId,
             respondent: blob.respondent,
             timestamp: answerData.timestamp || blob.submittedAt,
             answers: answerData.answers,
             consent: answerData.consent || blob.consentForSubscription
-          });
+          };
           
-          decryptedAnswers.set(blobId, decryptedData[decryptedData.length - 1]);
+          decryptedData.push(decryptedAnswer);
+          decryptedAnswers.set(blobId, decryptedAnswer);
+          console.log(`Successfully decrypted blob ${blobId.slice(0, 10)}...`);
         }
       } catch (err) {
-        console.log(err);
+        console.error(`Failed to decrypt blob ${blobId.slice(0, 10)}...`, err);
+        failedDecryptions.push(blobId);
         const errorMsg = err instanceof NoAccessError
           ? 'No access permission'
           : 'Could not decrypt file';
@@ -352,7 +401,14 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
 
     if (decryptedData.length > 0) {
       setDecryptedAnswers(new Map(decryptedAnswers));
-      showToast('success', `Successfully decrypted ${decryptedData.length} answer(s)`);
+      
+      // 显示详细的成功信息
+      const message = failedDecryptions.length > 0 
+        ? `Decrypted ${decryptedData.length} answers (${failedDecryptions.length} failed)`
+        : `Successfully decrypted ${decryptedData.length} answers`;
+      showToast('success', message);
+    } else {
+      showToast('error', 'Failed to decrypt any answers');
     }
   };
   

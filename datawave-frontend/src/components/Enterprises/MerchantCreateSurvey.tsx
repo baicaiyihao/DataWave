@@ -16,7 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { SuccessModal } from '../Common/SuccessModal';
-import './MerchantCreateSurvey.css';
+import '../../css/MerchantCreateSurvey.css';
 
 // 问题类型枚举
 enum QuestionType {

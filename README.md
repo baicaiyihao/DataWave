@@ -247,7 +247,7 @@ sui client publish --gas-budget 100000000
 
 ## 📞 Contact & Links
 
-- **Demo**: [datawave.demo](https://datawave.wal.app)
+- **Demo**: [datawave.wal.app](https://datawave.wal.app)
 
 ## 📄 License
 

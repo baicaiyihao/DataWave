@@ -22,7 +22,7 @@ import {
   ExternalLink,
   Wallet
 } from 'lucide-react';
-import './MyAnsweredSurveys.css';
+import '../../css/MyAnsweredSurveys.css';
 
 interface AnsweredSurvey {
   surveyId: string;

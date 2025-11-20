@@ -22,7 +22,7 @@ import {
   Shield
 } from 'lucide-react';
 import { set, get } from 'idb-keyval';
-import './SubscriptionDecrypt.css';
+import '../../css/SubscriptionDecrypt.css';
 
 const TTL_MIN = 10;
 
@@ -393,12 +393,12 @@ export function SubscriptionDecrypt() {
     }
     
     const aggregators = [
-      'aggregator1',
-      'aggregator2',
-      'aggregator3',
-      'aggregator4',
-      'aggregator5',
-      'aggregator6',
+      'https://aggregator.walrus-testnet.walrus.space',
+      'https://wal-aggregator-testnet.staketab.org',
+      'https://walrus-testnet-aggregator.redundex.com',
+      'https://walrus-testnet-aggregator.nodes.guru',
+      'https://aggregator.walrus.banansen.dev',
+      'https://walrus-testnet-aggregator.everstake.one',
     ];
     
     // Download single blob with retry
@@ -418,12 +418,13 @@ export function SubscriptionDecrypt() {
         attemptedAggregators.add(aggregator);
         
         try {
-          console.log(`Attempting download from ${aggregator} for blob ${blobId.slice(0, 10)}...`);
+          const aggregatorName = aggregator.split('.')[1] || 'aggregator';
+          console.log(`Attempting download from ${aggregatorName} for blob ${blobId.slice(0, 10)}...`);
           
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 10000);
           
-          const aggregatorUrl = `/${aggregator}/v1/blobs/${blobId}`;
+          const aggregatorUrl = `${aggregator}/v1/blobs/${blobId}`;
           const response = await fetch(aggregatorUrl, { 
             signal: controller.signal,
             headers: {

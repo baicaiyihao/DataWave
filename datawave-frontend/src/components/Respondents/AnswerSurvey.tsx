@@ -24,7 +24,7 @@ import {
   ClipboardList,
   Calendar
 } from 'lucide-react';
-import './AnswerSurvey.css';
+import '../../css/AnswerSurvey.css';
 
 interface Question {
   question_text: string;
@@ -52,17 +52,41 @@ interface Answer {
   answer: string | string[];
 }
 
-// Walrus服务配置
+// Walrus
 const WALRUS_SERVICES = [
-  { id: 'walrus.space', publisherUrl: '/publisher1', aggregatorUrl: '/aggregator1' },
-  { id: 'staketab.org', publisherUrl: '/publisher2', aggregatorUrl: '/aggregator2' },
-  { id: 'redundex.com', publisherUrl: '/publisher3', aggregatorUrl: '/aggregator3' },
-  { id: 'nodes.guru', publisherUrl: '/publisher4', aggregatorUrl: '/aggregator4' },
-  { id: 'banansen.dev', publisherUrl: '/publisher5', aggregatorUrl: '/aggregator5' },
-  { id: 'everstake.one', publisherUrl: '/publisher6', aggregatorUrl: '/aggregator6' },
+  { 
+    id: 'walrus.space', 
+    publisherUrl: 'https://publisher.walrus-testnet.walrus.space',
+    aggregatorUrl: 'https://aggregator.walrus-testnet.walrus.space'
+  },
+  { 
+    id: 'staketab.org', 
+    publisherUrl: 'https://wal-publisher-testnet.staketab.org',
+    aggregatorUrl: 'https://wal-aggregator-testnet.staketab.org'
+  },
+  { 
+    id: 'redundex.com', 
+    publisherUrl: 'https://walrus-testnet-publisher.redundex.com',
+    aggregatorUrl: 'https://walrus-testnet-aggregator.redundex.com'
+  },
+  { 
+    id: 'nodes.guru', 
+    publisherUrl: 'https://walrus-testnet-publisher.nodes.guru',
+    aggregatorUrl: 'https://walrus-testnet-aggregator.nodes.guru'
+  },
+  { 
+    id: 'banansen.dev', 
+    publisherUrl: 'https://publisher.walrus.banansen.dev',
+    aggregatorUrl: 'https://aggregator.walrus.banansen.dev'
+  },
+  { 
+    id: 'everstake.one', 
+    publisherUrl: 'https://walrus-testnet-publisher.everstake.one',
+    aggregatorUrl: 'https://walrus-testnet-aggregator.everstake.one'
+  },
 ];
 
-const MIN_GAS_BALANCE = 0.1; // 最小需要0.1 SUI来支付gas费
+const MIN_GAS_BALANCE = 0.1; // The minimum gas fee is 0.1 SUI.
 
 export function AnswerSurvey() {
   const { surveyId } = useParams<{ surveyId: string }>();
@@ -71,7 +95,7 @@ export function AnswerSurvey() {
   const currentAccount = useCurrentAccount();
   const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   
-  // Seal配置
+  // Seal configuration
   const serverObjectIds = [
     "0x73d05d62c18d9374e3ea529e8e0ed6161da1a141a94d3f76ae3fe4e99356db75",
     "0xf5d14a81a982144ae441cd7d64b09027f116a468bd36e7eca494f750591623c8"
@@ -93,13 +117,13 @@ export function AnswerSurvey() {
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [insufficientBalance, setInsufficientBalance] = useState(false);
   
-  // 答题状态
+  // Answering status
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [currentAnswer, setCurrentAnswer] = useState<string | string[]>('');
   const [consentForSubscription, setConsentForSubscription] = useState(false);
   
-  // 上传状态
+  // Upload status
   const [uploadProgress, setUploadProgress] = useState<{
     step: 'idle' | 'encrypting' | 'uploading' | 'submitting' | 'complete' | 'error';
     message: string;
@@ -112,7 +136,6 @@ export function AnswerSurvey() {
 
   const NUM_EPOCH = 30;
 
-  // 获取钱包余额
   const fetchWalletBalance = async () => {
     if (!currentAccount?.address) return;
     
@@ -129,7 +152,6 @@ export function AnswerSurvey() {
     }
   };
 
-  // 负载均衡上传到Walrus
   const uploadToWalrus = async (data: Uint8Array): Promise<{ blobId: string; service: string }> => {
     let lastError: Error | null = null;
     const attemptedServices: string[] = [];
@@ -138,7 +160,7 @@ export function AnswerSurvey() {
       attemptedServices.push(service.id);
       setUploadProgress({
         step: 'uploading',
-        message: `尝试上传到 ${service.id}...`,
+        message: `Try uploading to ${service.id}...`,
         serviceAttempts: attemptedServices
       });
 
@@ -163,7 +185,7 @@ export function AnswerSurvey() {
 
           setUploadProgress({
             step: 'uploading',
-            message: `成功上传到 ${service.id}`,
+            message: `Successfully uploaded to ${service.id}`,
             serviceAttempts: attemptedServices
           });
 
@@ -177,10 +199,10 @@ export function AnswerSurvey() {
       }
     }
 
-    throw new Error(`所有上传服务均失败: ${lastError?.message || 'Unknown error'}`);
+    throw new Error(`All upload services failed: ${lastError?.message || 'Unknown error'}`);
   };
 
-  // 加载问卷详情
+  // Load questionnaire details
   const loadSurvey = async () => {
     if (!surveyId) return;
     
@@ -215,7 +237,6 @@ export function AnswerSurvey() {
 
         setSurvey(surveyData);
 
-        // 检查是否已回答
         if (currentAccount?.address && fields.respondents?.fields?.id?.id) {
           try {
             const hasAnsweredField = await suiClient.getDynamicFieldObject({
@@ -246,7 +267,6 @@ export function AnswerSurvey() {
     fetchWalletBalance();
   }, [currentAccount]);
 
-  // 处理答案选择
   const handleSingleChoice = (value: string) => {
     setCurrentAnswer(value);
   };
@@ -264,12 +284,11 @@ export function AnswerSurvey() {
     setCurrentAnswer(value);
   };
 
-  // 保存并下一题
   const saveAndNext = () => {
     if (!survey) return;
     
     if (!currentAnswer || (Array.isArray(currentAnswer) && currentAnswer.length === 0)) {
-      alert('请提供一个答案');
+      alert('Please provide an answer.');
       return;
     }
 
@@ -296,7 +315,6 @@ export function AnswerSurvey() {
     }
   };
 
-  // 返回上一题
   const goBack = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
@@ -305,17 +323,14 @@ export function AnswerSurvey() {
     }
   };
 
-  // 提交答案
   const submitAnswers = async () => {
     if (!survey || !currentAccount?.address) return;
 
-    // 检查余额
     if (insufficientBalance) {
-      alert(`余额不足！需要至少 ${MIN_GAS_BALANCE} SUI 来支付交易费用。当前余额：${walletBalance.toFixed(3)} SUI`);
+      alert(`Insufficient balance! At least ${MIN_GAS_BALANCE} SUI is required to pay transaction fees. Current balance: ${walletBalance.toFixed(3)} SUI`);
       return;
     }
 
-    // 保存最后一题
     if (currentQuestionIndex === survey.questions.length - 1 && currentAnswer) {
       saveAndNext();
     }
@@ -330,15 +345,15 @@ export function AnswerSurvey() {
       }] : answers;
 
     if (finalAnswers.length !== survey.questions.length) {
-      alert(`请回答所有 ${survey.questions.length} 个问题`);
+      alert(`Please answer all ${survey.questions.length} questions.`);
       return;
     }
 
     setSubmitting(true);
-    setUploadProgress({ step: 'encrypting', message: '加密您的答案...', serviceAttempts: [] });
+    setUploadProgress({ step: 'encrypting', message: 'Encrypt your answer...', serviceAttempts: [] });
     
     try {
-      // 1. 准备答案数据
+      // 1. Prepare answer data
       const answerData = {
         surveyId: survey.id,
         respondent: currentAccount.address,
@@ -350,7 +365,7 @@ export function AnswerSurvey() {
       const answerJson = JSON.stringify(answerData);
       const answerBytes = new TextEncoder().encode(answerJson);
 
-      // 2. 生成ID
+      // 2. Create ID
       const nonce = crypto.getRandomValues(new Uint8Array(5));
       if (!surveyId) {
         throw new Error('Survey ID is required');
@@ -358,7 +373,7 @@ export function AnswerSurvey() {
       const surveyIdBytes = fromHex(surveyId.replace(/^0x/, ''));
       const id = toHex(new Uint8Array([...surveyIdBytes, ...nonce]));
       
-      // 3. Seal加密
+      // 3. Seal encrypt
       const { encryptedObject: encryptedData } = await sealClient.encrypt({
         threshold: 2,
         packageId: ConfigService.getPackageId(),
@@ -366,13 +381,11 @@ export function AnswerSurvey() {
         data: answerBytes,
       });
       
-      // 4. 负载均衡上传
       const { blobId, service } = await uploadToWalrus(encryptedData);
       
-      // 5. 提交到链上
       setUploadProgress({
         step: 'submitting',
-        message: '提交到区块链...',
+        message: 'Submit to blockchain...',
         serviceAttempts: [service]
       });
       
@@ -402,11 +415,11 @@ export function AnswerSurvey() {
           onSuccess: (result) => {
             setUploadProgress({
               step: 'complete',
-              message: '提交成功！',
+              message: 'Submission successful!',
               serviceAttempts: [service]
             });
             
-            // 保存记录
+            // Save Record
             const answerRecord = {
               surveyId: survey.id,
               blobId,
@@ -428,7 +441,7 @@ export function AnswerSurvey() {
             console.error('Transaction error:', error);
             setUploadProgress({
               step: 'error',
-              message: `提交失败: ${error.message}`,
+              message: `Submission failed: ${error.message}`,
               serviceAttempts: []
             });
           }
@@ -439,7 +452,7 @@ export function AnswerSurvey() {
       console.error('Submit error:', error);
       setUploadProgress({
         step: 'error',
-        message: error.message || '提交失败',
+        message: error.message || 'Submission failed',
         serviceAttempts: uploadProgress.serviceAttempts
       });
     } finally {

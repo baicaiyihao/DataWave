@@ -24,7 +24,7 @@ import {
   AlertCircle,
   X,
 } from 'lucide-react';
-import './MySurveys.css';
+import '../../css/MySurveys.css';
 
 interface SurveyData {
   id: string;

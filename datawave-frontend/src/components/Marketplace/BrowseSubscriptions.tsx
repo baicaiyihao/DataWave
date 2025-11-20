@@ -22,7 +22,7 @@ import {
   Zap,
   BarChart,
 } from 'lucide-react';
-import './BrowseSubscriptions.css';
+import '../../css/BrowseSubscriptions.css';
 
 interface SubscriptionSurvey {
   surveyId: string;

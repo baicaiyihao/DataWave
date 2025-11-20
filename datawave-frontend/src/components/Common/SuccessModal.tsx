@@ -1,7 +1,7 @@
 // src/components/Common/SuccessModal.tsx
 import { useEffect, useState } from 'react';
 import { Check, ExternalLink, Copy, ArrowRight } from 'lucide-react';
-import './SuccessModal.css';
+import '../../css/SuccessModal.css';
 
 interface SuccessModalProps {
   isOpen: boolean;

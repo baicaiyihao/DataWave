@@ -29,7 +29,7 @@ import {
   CreditCard,
   X
 } from 'lucide-react';
-import './SurveyManagementPage.css';
+import '../../css/SurveyManagementPage.css';
 
 
 // Import the decryption component

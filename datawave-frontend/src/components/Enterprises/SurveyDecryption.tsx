@@ -25,7 +25,7 @@ import {
   Clock
 } from 'lucide-react';
 import { set, get } from 'idb-keyval';
-import './SurveyDecryption.css';
+import '../../css/SurveyDecryption.css';
 
 const TTL_MIN = 10;
 
@@ -260,12 +260,12 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
     if (!sessionKey || !surveyId) return;
     
     const aggregators = [
-      'aggregator1',
-      'aggregator2',
-      'aggregator3',
-      'aggregator4',
-      'aggregator5',
-      'aggregator6',
+      'https://aggregator.walrus-testnet.walrus.space',
+      'https://wal-aggregator-testnet.staketab.org',
+      'https://walrus-testnet-aggregator.redundex.com',
+      'https://walrus-testnet-aggregator.nodes.guru',
+      'https://aggregator.walrus.banansen.dev',
+      'https://walrus-testnet-aggregator.everstake.one',
     ];
     
     const downloadResults = await Promise.all(
@@ -274,7 +274,7 @@ export function SurveyDecryption(props: SurveyDecryptionProps) {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 10000);
           const randomAggregator = aggregators[Math.floor(Math.random() * aggregators.length)];
-          const aggregatorUrl = `/${randomAggregator}/v1/blobs/${blobId}`;
+          const aggregatorUrl = `${randomAggregator}/v1/blobs/${blobId}`;
           const response = await fetch(aggregatorUrl, { signal: controller.signal });
           clearTimeout(timeout);
           if (!response.ok) {
